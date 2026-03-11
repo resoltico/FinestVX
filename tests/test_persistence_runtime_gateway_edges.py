@@ -237,6 +237,6 @@ class TestGatewayAndPackageEdges:
             lambda name: (_ for _ in ()).throw(importlib.metadata.PackageNotFoundError(name)),
         )
         reloaded = importlib.reload(module)
-        assert reloaded.__version__ == "0.0.0"
+        assert reloaded.__version__ == "0.0.0+dev"
         monkeypatch.undo()
         importlib.reload(module)
