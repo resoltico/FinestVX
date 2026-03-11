@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="ledger-book">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="accounts">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="account" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:attribute name="code" type="xs:string" use="required"/>
+                  <xs:attribute name="name" type="xs:string" use="required"/>
+                  <xs:attribute name="normal-side" type="xs:string" use="required"/>
+                  <xs:attribute name="currency" type="xs:string" use="required"/>
+                  <xs:attribute name="parent-code" type="xs:string"/>
+                  <xs:attribute name="allow-posting" type="xs:string" use="required"/>
+                  <xs:attribute name="active" type="xs:string" use="required"/>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="periods">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="period" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:attribute name="fiscal-year" type="xs:integer" use="required"/>
+                  <xs:attribute name="quarter" type="xs:integer" use="required"/>
+                  <xs:attribute name="month" type="xs:integer" use="required"/>
+                  <xs:attribute name="start-date" type="xs:string" use="required"/>
+                  <xs:attribute name="end-date" type="xs:string" use="required"/>
+                  <xs:attribute name="state" type="xs:string" use="required"/>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="transactions">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="transaction" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="entry" minOccurs="0" maxOccurs="unbounded">
+                      <xs:complexType>
+                        <xs:attribute name="account-code" type="xs:string" use="required"/>
+                        <xs:attribute name="side" type="xs:string" use="required"/>
+                        <xs:attribute name="amount" type="xs:string" use="required"/>
+                        <xs:attribute name="currency" type="xs:string" use="required"/>
+                        <xs:attribute name="description" type="xs:string"/>
+                        <xs:attribute name="tax-rate" type="xs:string"/>
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                  <xs:attribute name="reference" type="xs:string" use="required"/>
+                  <xs:attribute name="posted-at" type="xs:string" use="required"/>
+                  <xs:attribute name="state" type="xs:string" use="required"/>
+                  <xs:attribute name="description" type="xs:string" use="required"/>
+                  <xs:attribute name="reversal-of" type="xs:string"/>
+                  <xs:attribute name="period-fiscal-year" type="xs:integer"/>
+                  <xs:attribute name="period-quarter" type="xs:integer"/>
+                  <xs:attribute name="period-month" type="xs:integer"/>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+      <xs:attribute name="code" type="xs:string" use="required"/>
+      <xs:attribute name="name" type="xs:string" use="required"/>
+      <xs:attribute name="base-currency" type="xs:string" use="required"/>
+      <xs:attribute name="legislative-pack" type="xs:string" use="required"/>
+      <xs:attribute name="fiscal-start-month" type="xs:integer" use="required"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>
