@@ -2,7 +2,7 @@
 afad: "3.3"
 version: "0.1.0"
 domain: CHANGELOG
-updated: "2026-03-10"
+updated: "2026-03-11"
 route:
   keywords: [changelog, release notes, version history, breaking changes, migration, fixed, what's new]
   questions: ["what changed in version X?", "what are the breaking changes?", "what was fixed in the latest release?", "what is the release history?"]
@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-03-10
+## [0.1.0] - 2026-03-11
 
 ### Added
 
