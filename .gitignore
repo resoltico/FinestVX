@@ -1,0 +1,138 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+src/**/*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.whl.metadata/
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# PyCharm
+.idea/
+
+# VSCode
+.vscode/
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+coverage.json
+*.cover
+htmlcov/
+.tox/
+.nox/
+
+# Hypothesis database (ENTIRE directory - see rationale below)
+# RATIONALE: The .hypothesis/examples/ directory contains:
+#   - Standard runs: A few KB of regression examples (valuable)
+#   - HypoFuzz runs: 100k+ coverage examples (NOT valuable for git)
+# Since we can't distinguish between them, we ignore ALL and instead:
+#   1. Promote failing examples to @example() decorators in test code
+#   2. Keep corpus local to each developer's machine
+# This follows Hypothesis best practices and prevents 100MB+ commits.
+.hypothesis/
+
+# Atheris/libFuzzer corpus (binary seeds, machine-specific)
+.fuzz_atheris_corpus/
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Linting
+.ruff_cache/
+.pylint.d/
+
+# Benchmarks
+.benchmarks/
+benchmark.json
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+.python-version.lock
+
+# Version managers
+.tool-versions  # asdf
+.envrc          # direnv
+
+# Package managers
+poetry.lock
+Pipfile.lock
+pdm.lock
+
+# Environment variables
+.env
+.env.local
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# Backup files (all variants)
+*.bak*
+*.backup*
+*.old
+*.orig
+*_backup
+*_old
+*.swp
+*.swo
+
+# Build artifacts
+*.whl
+*.tar.gz
+
+# Documentation builds
+docs/_build/
+docs/.doctrees/
+
+# Security scans
+bandit-results.json
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Logs
+*.log
+pip-log.txt
+pip-delete-this-directory.txt
+pip-selfcheck.json
