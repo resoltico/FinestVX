@@ -112,7 +112,7 @@ class TestLocalizationServiceEdges:
         ):
             LocalizationService._raise_for_unclean_summary(
                 cast(
-                    Any,
+                    "Any",
                     _FakeSummary(
                         has_junk=True,
                         junk_results=(
@@ -131,7 +131,7 @@ class TestLocalizationServiceEdges:
         ):
             LocalizationService._raise_for_unclean_summary(
                 cast(
-                    Any,
+                    "Any",
                     _FakeSummary(
                         error_results=(
                             _FakeErrorResult(
@@ -146,7 +146,7 @@ class TestLocalizationServiceEdges:
         with pytest.raises(IntegrityCheckFailedError, match="Localization resource missing"):
             LocalizationService._raise_for_unclean_summary(
                 cast(
-                    Any,
+                    "Any",
                     _FakeSummary(
                         missing_results=(
                             _FakeMissingResult(resource_id="app.ftl", locale="lv-LV"),
@@ -216,3 +216,77 @@ class TestLocalizationServiceEdges:
         assert value == "Latvijas standarta pakotne 2026"
         assert errors == ()
         assert service.get_cache_stats() is not None
+
+    def test_config_message_variable_schemas_normalizes_set_to_frozenset(
+        self, tmp_path: Path
+    ) -> None:
+        """LocalizationConfig normalizes schema values to frozenset at construction time."""
+        config = LocalizationConfig(
+            locales=("lv-LV",),
+            resource_ids=("app.ftl",),
+            base_path=tmp_path / "{locale}",
+            message_variable_schemas={"greeting": frozenset({"name", "title"})},
+        )
+
+        assert isinstance(config.message_variable_schemas["greeting"], frozenset)
+        assert config.message_variable_schemas["greeting"] == frozenset({"name", "title"})
+
+    def test_config_message_variable_schemas_defaults_to_empty_dict(
+        self, tmp_path: Path
+    ) -> None:
+        """LocalizationConfig defaults message_variable_schemas to an empty dict."""
+        config = LocalizationConfig(
+            locales=("lv-LV",),
+            resource_ids=("app.ftl",),
+            base_path=tmp_path / "{locale}",
+        )
+
+        assert config.message_variable_schemas == {}
+
+    def test_schema_validation_rejects_unknown_message_id(self, tmp_path: Path) -> None:
+        """Boot fails when the schema references a message absent from all locales."""
+        base_path = tmp_path / "locales"
+        (base_path / "lv-LV").mkdir(parents=True)
+        (base_path / "lv-LV" / "app.ftl").write_text(
+            "greeting = Sveiks!\n",
+            encoding="utf-8",
+        )
+
+        with pytest.raises(
+            IntegrityCheckFailedError,
+            match="not found in any locale",
+        ):
+            LocalizationService(
+                LocalizationConfig(
+                    locales=("lv-LV",),
+                    resource_ids=("app.ftl",),
+                    base_path=base_path / "{locale}",
+                    message_variable_schemas={"nonexistent-message": frozenset({"name"})},
+                )
+            )
+
+    def test_schema_validation_error_message_names_both_missing_and_extra(
+        self, tmp_path: Path
+    ) -> None:
+        """Error message includes both missing and extra variable names when both are present."""
+        base_path = tmp_path / "locales"
+        (base_path / "lv-LV").mkdir(parents=True)
+        (base_path / "lv-LV" / "app.ftl").write_text(
+            "invoice = Nr. { $ref } summa { $amount }\n",
+            encoding="utf-8",
+        )
+
+        with pytest.raises(IntegrityCheckFailedError) as exc_info:
+            LocalizationService(
+                LocalizationConfig(
+                    locales=("lv-LV",),
+                    resource_ids=("app.ftl",),
+                    base_path=base_path / "{locale}",
+                    # schema expects 'id' and 'total' but FTL declares 'ref' and 'amount'
+                    message_variable_schemas={"invoice": frozenset({"id", "total"})},
+                )
+            )
+
+        error_text = str(exc_info.value)
+        assert "missing=" in error_text
+        assert "extra=" in error_text

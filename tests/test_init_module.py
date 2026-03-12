@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from ftllexengine.parsing import ParseResult
+from ftllexengine import ParseResult
 from ftllexengine.runtime.function_bridge import FluentNumber
 
 import finestvx
@@ -68,5 +68,5 @@ class TestPackageInit:
         )
         assert valid_amount[0] is not None
 
-        # Verify ParseResult exists and is importable (the canonical type)
+        # ParseResult is now exported from the ftllexengine top-level package.
         assert ParseResult is not None

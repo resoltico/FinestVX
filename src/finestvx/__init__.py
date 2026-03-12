@@ -8,8 +8,8 @@ from importlib.metadata import version as _get_version
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from ftllexengine import get_cldr_version
     from ftllexengine.core.fiscal import FiscalDelta, MonthEndPolicy
-    from ftllexengine.introspection import get_cldr_version
 
     from .core import (
         Account,
@@ -194,7 +194,7 @@ _EXPORT_MAP: dict[str, tuple[str, str]] = {
         "create_default_pack_registry",
     ),
     "create_snapshot": ("finestvx.persistence", "create_snapshot"),
-    "get_cldr_version": ("ftllexengine.introspection", "get_cldr_version"),
+    "get_cldr_version": ("ftllexengine", "get_cldr_version"),
     "parse_amount_input": ("finestvx.localization", "parse_amount_input"),
     "parse_currency_input": ("finestvx.localization", "parse_currency_input"),
     "parse_date_input": ("finestvx.localization", "parse_date_input"),

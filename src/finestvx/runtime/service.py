@@ -4,23 +4,29 @@ from __future__ import annotations
 
 from concurrent.futures import Future
 from dataclasses import dataclass
-from pathlib import Path
 from queue import Empty, Queue
 from threading import Event, Thread
-from typing import Literal
+from typing import TYPE_CHECKING
 
 from ftllexengine.runtime.rwlock import RWLock
 
-from finestvx.core.models import Book, JournalTransaction
-from finestvx.legislation.protocols import LegislativeValidationResult
 from finestvx.persistence import (
-    AuditContext,
-    DatabaseSnapshot,
-    PersistenceConfig,
     SqliteLedgerStore,
-    StoreDebugSnapshot,
 )
-from finestvx.persistence.store import AuditLogRecord
+
+if TYPE_CHECKING:
+    from pathlib import Path
+    from typing import Self
+
+    from finestvx.core.models import Book, JournalTransaction
+    from finestvx.legislation.protocols import LegislativeValidationResult
+    from finestvx.persistence import (
+        AuditContext,
+        DatabaseSnapshot,
+        PersistenceConfig,
+        StoreDebugSnapshot,
+    )
+    from finestvx.persistence.store import AuditLogRecord
 
 __all__ = [
     "LedgerRuntime",
@@ -49,18 +55,49 @@ class RuntimeConfig:
             raise ValueError(msg)
 
 
-@dataclass(slots=True)
-class _WriteCommand:
-    """Internal queued write request."""
+@dataclass(frozen=True, slots=True)
+class _CreateBookCommand:
+    """Internal queued request for immutable book creation."""
 
-    kind: Literal["append_legislative_result", "append_transaction", "create_book"]
-    payload: (
-        Book
-        | tuple[str, JournalTransaction]
-        | tuple[str, str, LegislativeValidationResult]
-    )
+    book: Book
     audit_context: AuditContext
     future: Future[None]
+
+
+@dataclass(frozen=True, slots=True)
+class _AppendTransactionCommand:
+    """Internal queued request for a posted transaction append."""
+
+    book_code: str
+    transaction: JournalTransaction
+    audit_context: AuditContext
+    future: Future[None]
+
+
+@dataclass(frozen=True, slots=True)
+class _AppendLegislativeResultCommand:
+    """Internal queued request for a legislative audit append."""
+
+    book_code: str
+    transaction_reference: str
+    result: LegislativeValidationResult
+    audit_context: AuditContext
+    future: Future[None]
+
+
+type _WriteCommand = (
+    _AppendLegislativeResultCommand | _AppendTransactionCommand | _CreateBookCommand
+)
+
+
+def _require_write_command(command: object) -> _WriteCommand:
+    """Validate that a queued object is one of the supported write commands."""
+    match command:
+        case _CreateBookCommand() | _AppendTransactionCommand() | _AppendLegislativeResultCommand():
+            return command
+        case _:
+            msg = "command must be a supported write command"
+            raise TypeError(msg)
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,7 +160,7 @@ class LedgerRuntime:
         self._store.close()
         self._started = False
 
-    def __enter__(self) -> LedgerRuntime:
+    def __enter__(self) -> Self:
         """Enter context-manager scope."""
         return self
 
@@ -141,38 +178,36 @@ class LedgerRuntime:
         """
         try:
             with self._lock.write(timeout=self._config.write_lock_timeout):
-                match command.kind:
-                    case "create_book":
-                        if not isinstance(command.payload, Book):
-                            msg = "create_book payload must be Book"
-                            raise TypeError(msg)
+                match command:
+                    case _CreateBookCommand(book=book, audit_context=audit_context):
                         self._store.create_book(
-                            command.payload,
-                            audit_context=command.audit_context,
+                            book,
+                            audit_context=audit_context,
                         )
-                    case "append_transaction":
-                        if not isinstance(command.payload, tuple) or len(command.payload) != 2:
-                            msg = "append_transaction payload must be tuple"
-                            raise TypeError(msg)
-                        book_code, transaction = command.payload
+                    case _AppendTransactionCommand(
+                        book_code=book_code,
+                        transaction=transaction,
+                        audit_context=audit_context,
+                    ):
                         self._store.append_transaction(
                             book_code,
                             transaction,
-                            audit_context=command.audit_context,
+                            audit_context=audit_context,
                         )
-                    case "append_legislative_result":
-                        if not isinstance(command.payload, tuple) or len(command.payload) != 3:
-                            msg = "append_legislative_result payload must be tuple"
-                            raise TypeError(msg)
-                        book_code, reference, result = command.payload
+                    case _AppendLegislativeResultCommand(
+                        book_code=book_code,
+                        transaction_reference=transaction_reference,
+                        result=result,
+                        audit_context=audit_context,
+                    ):
                         self._store.append_legislative_result(
                             book_code,
-                            reference,
+                            transaction_reference,
                             result,
-                            audit_context=command.audit_context,
+                            audit_context=audit_context,
                         )
             command.future.set_result(None)
-        except Exception as error:  # pylint: disable=broad-exception-caught
+        except Exception as error:
             # Future-based dispatch: any exception from a write operation must become
             # Future.set_exception() so the caller receives it via Future.result(),
             # rather than leaving the write thread dead and the error silently dropped.
@@ -191,31 +226,27 @@ class LedgerRuntime:
 
     def _submit(
         self,
-        *,
-        kind: Literal["append_legislative_result", "append_transaction", "create_book"],
-        payload: (
-            Book
-            | tuple[str, JournalTransaction]
-            | tuple[str, str, LegislativeValidationResult]
-        ),
-        audit_context: AuditContext,
+        command: object,
     ) -> None:
         """Submit a write request and wait for completion."""
-        future: Future[None] = Future()
+        queued_command = _require_write_command(command)
         self._queue.put(
-            _WriteCommand(
-                kind=kind,
-                payload=payload,
-                audit_context=audit_context,
-                future=future,
-            ),
+            queued_command,
             timeout=self._config.queue_timeout,
         )
-        future.result(timeout=self._config.queue_timeout + self._config.poll_interval)
+        queued_command.future.result(
+            timeout=self._config.queue_timeout + self._config.poll_interval
+        )
 
     def create_book(self, book: Book, *, audit_context: AuditContext) -> None:
         """Persist a new book through the dedicated write thread."""
-        self._submit(kind="create_book", payload=book, audit_context=audit_context)
+        self._submit(
+            _CreateBookCommand(
+                book=book,
+                audit_context=audit_context,
+                future=Future(),
+            )
+        )
 
     def append_transaction(
         self,
@@ -226,9 +257,12 @@ class LedgerRuntime:
     ) -> None:
         """Append a posted transaction through the dedicated write thread."""
         self._submit(
-            kind="append_transaction",
-            payload=(book_code, transaction),
-            audit_context=audit_context,
+            _AppendTransactionCommand(
+                book_code=book_code,
+                transaction=transaction,
+                audit_context=audit_context,
+                future=Future(),
+            )
         )
 
     def append_legislative_result(
@@ -241,9 +275,13 @@ class LedgerRuntime:
     ) -> None:
         """Append a post-commit legislative result through the dedicated write thread."""
         self._submit(
-            kind="append_legislative_result",
-            payload=(book_code, transaction_reference, result),
-            audit_context=audit_context,
+            _AppendLegislativeResultCommand(
+                book_code=book_code,
+                transaction_reference=transaction_reference,
+                result=result,
+                audit_context=audit_context,
+                future=Future(),
+            )
         )
 
     def get_book_snapshot(self, book_code: str) -> Book:

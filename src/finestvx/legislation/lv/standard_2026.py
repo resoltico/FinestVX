@@ -6,17 +6,20 @@ from dataclasses import dataclass, field
 from decimal import ROUND_HALF_UP as _ROUND_HALF_UP
 from decimal import Decimal
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from ftllexengine.runtime.function_bridge import FluentNumber, FunctionRegistry, fluent_function
 from ftllexengine.runtime.functions import get_shared_registry
 
-from finestvx.core.models import Book, JournalTransaction
 from finestvx.legislation.protocols import (
     LegislativeIssue,
     LegislativePackMetadata,
     LegislativeValidationResult,
 )
 from finestvx.localization import LocalizationConfig, LocalizationService
+
+if TYPE_CHECKING:
+    from finestvx.core.models import Book, JournalTransaction
 
 __all__ = ["LatviaStandard2026Pack"]
 

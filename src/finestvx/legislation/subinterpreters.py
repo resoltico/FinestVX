@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from concurrent import interpreters
-
-from finestvx.core.models import Book, JournalTransaction
+from typing import TYPE_CHECKING
 
 from .protocols import LegislativeIssue, LegislativeValidationResult
 from .registry import create_default_pack_registry
+
+if TYPE_CHECKING:
+    from finestvx.core.models import Book, JournalTransaction
 
 __all__ = [
     "LegislativeInterpreterRunner",

@@ -3,11 +3,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
-
-import apsw
+from typing import TYPE_CHECKING
 
 from .sql import render_sql
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    import apsw
 
 __all__ = [
     "CORE_TABLES",

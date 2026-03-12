@@ -73,7 +73,7 @@ class TestLegislativeProtocolDataclasses:
 
         with pytest.raises(TypeError, match="pack_code must be str"):
             LegislativePackMetadata(
-                pack_code=cast(Any, 1),
+                pack_code=cast("Any", 1),
                 territory_code="LV",
                 tax_year=2026,
                 default_locale="lv-LV",
@@ -125,7 +125,7 @@ class TestLegislativeProtocolDataclasses:
                 territory_code="LV",
                 tax_year=2026,
                 default_locale="lv-LV",
-                currencies=cast(Any, {"EUR"}),
+                currencies=cast("Any", {"EUR"}),
             )
 
     def test_issue_and_validation_result_enforce_shape(self) -> None:
@@ -142,7 +142,7 @@ class TestLegislativeProtocolDataclasses:
         assert accepted_result.accepted is True
 
         with pytest.raises(TypeError, match="code must be str"):
-            LegislativeIssue(code=cast(Any, 1), message="Wrong rate")
+            LegislativeIssue(code=cast("Any", 1), message="Wrong rate")
         with pytest.raises(ValueError, match="message must not be empty"):
             LegislativeIssue(code="VAT_MISMATCH", message=" ")
         with pytest.raises(TypeError, match="entry_index must be int"):

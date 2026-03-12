@@ -8,7 +8,7 @@ Philosophy:
     project-agnostic "dead-man's switch" that guarantees the environment
     executing it matches the strict requirements of the project.
 
-Architecture & 10/10 Specs:
+Architecture & Specs:
     This script relies on `pyproject.toml` as the single source of truth for
     project metadata. It strictly requires:
     1. `[project].name`: Used to dynamically resolve the package for the
@@ -27,7 +27,6 @@ Exit Codes:
 
 from __future__ import annotations
 
-import contextlib
 import importlib
 import os
 import sys
@@ -47,18 +46,12 @@ def _read_project_metadata() -> tuple[tuple[int, int], str]:
             data = tomllib.load(f)
         project = data.get("project", {})
 
-        # Parse ">= 3.13", ">=3.13", or compound ">=3.14,<3.15" → (3, 13) / (3, 14).
-        # Compound specifiers (PEP 440) are split on "," and the ">=" clause is extracted.
-        req_str = project.get("requires-python", ">=3.8")
-        min_py = _FALLBACK_MIN_PYTHON
-        for raw_spec in req_str.split(","):
-            clause = raw_spec.strip()
-            if clause.startswith(">="):
-                version_str = clause[2:].strip()
-                parts = version_str.split(".")
-                with contextlib.suppress(ValueError, IndexError):
-                    min_py = (int(parts[0]), int(parts[1]) if len(parts) > 1 else 0)
-                break
+        # Parse ">=3.14,<3.15" or ">=3.13" → (3, 14).
+        # Split on comma first to isolate the lower-bound specifier before stripping operators.
+        raw = project.get("requires-python", ">=3.8")
+        lower = raw.split(",")[0].strip().lstrip(">= ")
+        parts = lower.split(".")
+        min_py = (int(parts[0]), int(parts[1]) if len(parts) > 1 else 0)
 
         # Parse package name, falling back to guessing from src/ if missing
         pkg_name = project.get("name", "")

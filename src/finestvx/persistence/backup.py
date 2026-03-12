@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-from .config import DatabaseSnapshot
-from .store import SqliteLedgerStore
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from .config import DatabaseSnapshot
+    from .store import SqliteLedgerStore
 
 __all__ = ["create_snapshot"]
 

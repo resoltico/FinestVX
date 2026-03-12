@@ -2,10 +2,10 @@
 afad: "3.3"
 version: "0.1.0"
 domain: SECONDARY
-updated: "2026-03-09"
+updated: "2026-03-11"
 route:
-  keywords: [localization config, localization service, fluentlocalization, pathresourceloader, fallback events, strict boot, localized parsing, amount parse result, parse decimal, parse date, parse currency, parse amount, cache stats]
-  questions: ["how does finestvx localization work?", "how are FTL resources validated at boot?", "what fallback data is exposed?", "how are localized values parsed back in?", "how do i format a message?", "what is AmountParseResult?"]
+  keywords: [localization config, localization service, fluentlocalization, pathresourceloader, fallback events, strict boot, localized parsing, amount parse result, parse decimal, parse date, parse currency, parse amount, cache stats, message variable schemas, ftl schema validation]
+  questions: ["how does finestvx localization work?", "how are FTL resources validated at boot?", "what fallback data is exposed?", "how are localized values parsed back in?", "how do i format a message?", "what is AmountParseResult?", "how do i validate FTL message variables at boot?"]
 ---
 
 # FinestVX Localization Reference
@@ -27,6 +27,7 @@ class LocalizationConfig:
     strict: bool = True
     require_all_clean: bool = True
     cache: CacheConfig = MANDATED_CACHE_CONFIG
+    message_variable_schemas: dict[str, frozenset[str]] = field(default_factory=dict)
 ```
 
 ### Constraints
@@ -35,6 +36,7 @@ class LocalizationConfig:
 - `strict=True` causes `FormattingIntegrityError` on any resolution failure or missing message.
 - `require_all_clean=True` enforces `LoadSummary.all_clean` at boot (Junk entries fail, not just I/O errors).
 - `cache` defaults to `MANDATED_CACHE_CONFIG`.
+- `message_variable_schemas`: optional mapping of message IDs to expected variable sets. When non-empty, `LocalizationService` validates each message's declared FTL variables against the specified set at boot. Dict values are normalized to `frozenset` by `__post_init__`. Default: empty dict (no schema validation).
 
 ---
 
@@ -82,12 +84,30 @@ class LocalizationService:
 
 ### Constraints
 - Constructor: loads all FTL resources eagerly; raises `SyntaxIntegrityError` on Junk entries when `require_all_clean=True`; raises `IntegrityCheckFailedError` on I/O failures.
+- Constructor: when `config.message_variable_schemas` is non-empty, validates each message's declared variables against the expected set after the load-summary check; raises `IntegrityCheckFailedError` if any message is missing from all locales or if declared and expected variables do not match exactly.
 - `summary`: the `LoadSummary` produced at initialization; immutable post-construction.
 - `fallback_events`: accumulated `FallbackInfo` records for every locale fallback resolution since boot.
 - `on_fallback`: optional callback invoked synchronously on each fallback; also recorded in `fallback_events`.
 - `format_value` / `format_pattern`: delegate to `FluentLocalization`; return `(formatted_string, errors)`.
 - `get_cache_stats`: returns `LocalizationCacheStats | None`; `None` when caching is not active.
 - `clear_module_caches`: clears all FTLLexEngine bounded module-level caches.
+
+### Example: FTL variable schema validation at boot
+```python
+service = LocalizationService(
+    LocalizationConfig(
+        locales=("lv-LV",),
+        resource_ids=("invoices.ftl",),
+        base_path=Path("locales/{locale}"),
+        message_variable_schemas={
+            "invoice-total": frozenset({"amount", "currency"}),
+            "greeting": frozenset({"name"}),
+        },
+    )
+)
+# Raises IntegrityCheckFailedError at boot if any declared FTL variable set
+# does not match the schema exactly (missing or extra variables both fail).
+```
 
 ---
 
@@ -101,10 +121,10 @@ type AmountParseResult = ParseResult[FluentNumber]
 ```
 
 ### Constraints
-- Purpose: names `ParseResult[FluentNumber]` from `ftllexengine.parsing` — the result of localized decimal parsing into the `FluentNumber` amount type.
+- Purpose: names `ParseResult[FluentNumber]` — the result of localized decimal parsing into the `FluentNumber` amount type.
 - First element: parsed `FluentNumber` or `None` on failure.
 - Second element: `tuple[FrozenFluentError, ...]`; empty on success.
-- `ParseResult[T]` is the canonical FTLLexEngine generic type for all parsing function returns.
+- `ParseResult[T]` is the canonical FTLLexEngine generic type for all parsing function returns; importable as `from ftllexengine import ParseResult`.
 
 ---
 
@@ -151,6 +171,7 @@ def parse_date_input(value: str, locale_code: str) -> ParseResult[date]: ...
 ### Constraints
 - Return: `(date, ())` on success; `(None, errors)` on failure.
 - ISO 8601 format (`YYYY-MM-DD`) is always accepted regardless of locale.
+- CLDR locale-specific patterns are accepted for all supported locales, including both the CLDR-defined 2-digit year form and the 4-digit year variant. For example, lv-LV accepts `"15.01.26"` (CLDR short `dd.MM.yy`) and `"15.01.2026"` (4-digit year).
 
 ---
 

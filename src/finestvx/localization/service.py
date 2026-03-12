@@ -2,18 +2,24 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from ftllexengine import clear_module_caches
 from ftllexengine.integrity import IntegrityCheckFailedError, IntegrityContext, SyntaxIntegrityError
-from ftllexengine.localization.loading import FallbackInfo, LoadSummary, PathResourceLoader
-from ftllexengine.localization.orchestrator import FluentLocalization, LocalizationCacheStats
-from ftllexengine.runtime.cache_config import CacheConfig
-from ftllexengine.runtime.value_types import FluentValue
+from ftllexengine.localization.loading import PathResourceLoader
+from ftllexengine.localization.orchestrator import FluentLocalization
 
 from finestvx.persistence.config import MANDATED_CACHE_CONFIG
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from ftllexengine.localization.loading import FallbackInfo, LoadSummary
+    from ftllexengine.localization.orchestrator import LocalizationCacheStats
+    from ftllexengine.runtime.cache_config import CacheConfig
+    from ftllexengine.runtime.value_types import FluentValue
 
 __all__ = [
     "LocalizationConfig",
@@ -32,12 +38,18 @@ class LocalizationConfig:
     strict: bool = True
     require_all_clean: bool = True
     cache: CacheConfig = field(default=MANDATED_CACHE_CONFIG)
+    message_variable_schemas: dict[str, frozenset[str]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Normalize tuple storage and validate required fields."""
         object.__setattr__(self, "locales", tuple(self.locales))
         object.__setattr__(self, "resource_ids", tuple(self.resource_ids))
         object.__setattr__(self, "base_path", Path(self.base_path))
+        object.__setattr__(
+            self,
+            "message_variable_schemas",
+            {k: frozenset(v) for k, v in self.message_variable_schemas.items()},
+        )
         if len(self.locales) == 0:
             msg = "locales must not be empty"
             raise ValueError(msg)
@@ -78,6 +90,8 @@ class LocalizationService:
         self._summary = self._localization.get_load_summary()
         if config.require_all_clean and not self._summary.all_clean:
             self._raise_for_unclean_summary(self._summary)
+        if config.message_variable_schemas:
+            self._validate_message_schemas(config.message_variable_schemas)
 
     @staticmethod
     def _raise_for_unclean_summary(summary: LoadSummary) -> None:
@@ -125,6 +139,42 @@ class LocalizationService:
                 f"{first_missing.locale}/{first_missing.resource_id}"
             )
             raise IntegrityCheckFailedError(msg, context=context)
+
+    def _validate_message_schemas(self, schemas: dict[str, frozenset[str]]) -> None:
+        """Validate each declared message's variables against the expected schema.
+
+        Raises:
+            IntegrityCheckFailedError: When a message is absent from all locales
+                or its declared variables do not match the expected set exactly.
+        """
+        for message_id, expected_vars in schemas.items():
+            try:
+                declared_vars = self._localization.get_message_variables(message_id)
+            except KeyError:
+                context = IntegrityContext(
+                    component="localization",
+                    operation="boot-schema-validate",
+                    key=message_id,
+                    actual="not found",
+                )
+                msg = f"Schema validation: message {message_id!r} not found in any locale"
+                raise IntegrityCheckFailedError(msg, context=context) from None
+            missing_vars = expected_vars - declared_vars
+            extra_vars = declared_vars - expected_vars
+            if missing_vars or extra_vars:
+                parts: list[str] = []
+                if missing_vars:
+                    parts.append(f"missing={sorted(missing_vars)!r}")
+                if extra_vars:
+                    parts.append(f"extra={sorted(extra_vars)!r}")
+                context = IntegrityContext(
+                    component="localization",
+                    operation="boot-schema-validate",
+                    key=message_id,
+                    actual=f"declared={sorted(declared_vars)!r}",
+                )
+                msg = f"FTL message {message_id!r} variable mismatch: {', '.join(parts)}"
+                raise IntegrityCheckFailedError(msg, context=context)
 
     @property
     def summary(self) -> LoadSummary:

@@ -42,7 +42,7 @@ class TestPersistenceSqlTemplates:
         with pytest.raises(ValueError, match="Invalid SQLite identifier"):
             render_sql(t"SELECT * FROM {invalid_identifier:identifier}")
         with pytest.raises(TypeError, match="SQLite identifier must be str"):
-            quote_identifier(cast(Any, 123))
+            quote_identifier(cast("Any", 123))
         with pytest.raises(TypeError, match="SQLite literal values must not be bool"):
             quote_literal(True)
         with pytest.raises(ValueError, match="Unsupported SQL template format spec"):

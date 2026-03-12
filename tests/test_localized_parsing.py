@@ -70,6 +70,22 @@ class TestLocalizedParsing:
         assert amount_value is None
         assert len(errors) > 0
 
+    def test_date_parsing_accepts_latvian_locale_cldr_format(self) -> None:
+        """parse_date_input accepts the lv-LV CLDR short pattern with a 4-digit year.
+
+        CLDR short date pattern for lv-LV is ``dd.MM.yy``; financial documents
+        routinely use the full 4-digit year form ``dd.MM.yyyy``.  FTLLexEngine
+        v0.148.0 fixed the parser to generate a ``%Y`` (4-digit) variant alongside
+        every ``%y`` CLDR pattern, so both forms are now accepted.
+        """
+        result, errors = parse_date_input("15.01.2026", "lv-LV")
+
+        assert errors == (), f"Unexpected parse errors: {errors}"
+        assert result is not None
+        assert result.year == 2026
+        assert result.month == 1
+        assert result.day == 15
+
     def test_parse_functions_are_ftllexengine_aliases(self) -> None:
         """The four alias functions are the exact same callables as ftllexengine's."""
         assert parse_decimal_input is parse_decimal

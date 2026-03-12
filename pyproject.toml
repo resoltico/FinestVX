@@ -8,7 +8,7 @@ package = true
 
 [project]
 name = "finestvx"
-version = "0.1.0"
+version = "0.2.0"
 description = "Headless, country-agnostic bookkeeping core engine"
 readme = "README.md"
 requires-python = ">=3.14,<3.15"
@@ -38,8 +38,8 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "apsw>=3.51.2.0",
-    "ftllexengine[babel]>=0.148.0",
+    "apsw>=3.52.0.0",
+    "ftllexengine[babel]>=0.149.0",
     "lxml>=6.0.2,<7.0.0",
     "reportlab>=4.4.10,<5.0.0",
 ]
@@ -50,7 +50,6 @@ dev = [
     "pytest-cov>=7.0.0",
     "hypothesis>=6.151.9",
     "mypy>=1.19.1",
-    "pylint>=4.0.5",
     "ruff>=0.15.5",
     "pytest-benchmark>=5.2.3",
     "pytest-xdist>=3.8.0",
@@ -146,75 +145,83 @@ line-length = 100
 target-version = "py314"
 
 [tool.ruff.lint]
-select = [
-    "E",
-    "W",
-    "F",
-    "I",
-    "N",
-    "UP",
-    "B",
-    "C4",
-    "DTZ",
-    "T10",
-    "EM",
-    "ISC",
-    "ICN",
-    "PIE",
-    "PT",
-    "Q",
-    "RSE",
-    "RET",
-    "SIM",
-    "TID",
-    "ARG",
-    "PTH",
-    "ERA",
-    "PL",
-    "RUF",
-]
+# select = ["ALL"] is the strictest posture: new Ruff rules automatically apply.
+# Explicit ignore list below covers rules that are genuinely inapplicable to this project.
+select = ["ALL"]
 ignore = [
-    "PLR0913",
-    "PLR2004",
+    # --- Docstring style (D / pydocstyle) ---
+    # Project uses Google-style docstrings enforced by CLAUDE.md §2.3.
+    # pydocstyle enforces numpy/sphinx conventions that conflict with Google-style.
+    "D",
+
+    # --- Formatter territory ---
+    # Trailing commas (COM812) and single-line string concatenation (ISC001)
+    # are formatter decisions. Not running ruff format.
+    "COM812",
+    "ISC001",
+
+    # --- Annotation style (entire ANN family) ---
+    # All argument and return annotations are enforced by mypy strict — redundant in Ruff.
+    "ANN",
+
+    # --- Exception style (conflicts with existing waivers) ---
+    # TRY003: Long exception messages. Conflicts with EM (flake8-errmsg, already enabled).
+    # TRY300: Return in try block; project uses early-return pattern intentionally.
+    "TRY003",
+    "TRY300",
+
+    # --- Unused / inapplicable rule families ---
+    "CPY",   # copyright notices — not applicable
+    "INT",   # gettext i18n — not applicable
+    "PD",    # pandas — not applicable
+    "NPY",   # numpy — not applicable
+    "DJ",    # django — not applicable
+    "AIR",   # apache airflow — not applicable
+    "ASYNC", # trio/anyio async — not applicable (PEP 734 subinterpreters handle isolation)
+    "TD",    # TODO comments — tracked in GitHub issues, not inline
+    "FIX",   # FIXME/TODO/HACK markers — same as TD
+
+    # --- Already explicitly handled ---
+    "PLR0913",  # Too many arguments — acceptable for configuration objects
+    "PLR2004",  # Magic values — acceptable for SQL/financial protocol constants
 ]
 
-[tool.pylint.main]
-py-version = "3.14"
-ignore-paths = ["^tests/.*$"]
-extension-pkg-allow-list = ["apsw", "lxml.etree"]
+[tool.ruff.lint.per-file-ignores]
+# PRODUCTION CODE - Architectural patterns only (real bugs fixed separately)
 
-[tool.pylint.messages_control]
-disable = [
-    "too-few-public-methods",
-    "too-many-arguments",
-    "too-many-instance-attributes",
-    "too-many-locals",
-    "too-many-branches",
-    "too-many-statements",
-    "too-many-lines",
-    "too-many-positional-arguments",
-    "protected-access",
-    "fixme",
-    "too-many-public-methods",
-    "duplicate-code",
-    "too-many-return-statements",
-    "import-outside-toplevel",
-    "cyclic-import",
-    "unreachable",
-    "assignment-from-no-return",
-    "invalid-name",
-    "unused-variable",
-    "unused-argument",
-    "line-too-long",
-    "import-error",
-]
+# persistence/schema.py: PEP 750 template strings (`t"""..."""`); mypy misc suppression
+# is file-level in the source; ERA001: schema comments document SQL intent
+"src/finestvx/persistence/schema.py" = ["ERA001"]
 
-[tool.pylint.format]
-max-line-length = 100
+# persistence/store.py: APSW is a C extension with incomplete stubs; SLF001 for
+# internal APSW connection state access; C901 for WAL coordination complexity
+"src/finestvx/persistence/store.py" = ["SLF001", "C901"]
 
-[tool.pylint.design]
-max-args = 7
-max-attributes = 10
-max-locals = 20
-max-branches = 20
-max-nested-blocks = 6
+# runtime/service.py: BLE001 — Future dispatch requires catching all exceptions to
+# avoid killing the background write thread (see Known Waiver Registry)
+"src/finestvx/runtime/service.py" = ["BLE001"]
+
+# TESTS - Blanket waivers for all test files
+# S101: assert is the standard pytest assertion mechanism; bandit S101 targets production code
+# S108: /tmp paths in tests are intentional for temp fixture directories
+# S110: try-except-pass catches expected failure paths without logging
+# S310/S311/S603: security rules targeting production code; not applicable in controlled tests
+# BLE001: broad-except used intentionally to test error isolation
+# TRY301: raise-in-try is a natural pattern for test invariant guards
+# FBT001/FBT002/FBT003: test helpers and Hypothesis strategies may use bool flags
+# SLF001: integration and white-box tests verify internal state via private members
+# TC001/TC002/TC003: tests do not need TYPE_CHECKING import optimization
+# PGH003: bare type: ignore in tests where specific codes vary across Python versions
+# T201: conftest.py and some test helpers print to stdout for diagnostics
+# C901: shadow objects and test helpers mirror production dispatch
+# E501: test docstrings and assertion messages may exceed 100 chars for clarity
+# PERF401/PERF402: test loops are not performance-critical paths
+"tests/**/*.py" = ["S101", "S108", "S110", "S310", "S311", "S603", "BLE001", "TRY301", "FBT001", "FBT002", "FBT003", "SLF001", "TC001", "TC002", "TC003", "PGH003", "T201", "C901", "E501", "PERF401", "PERF402"]
+
+# SCRIPTS - Developer tooling
+# T201: scripts output to terminal by design
+# EXE001: shebang files; executability managed externally
+# FBT001/FBT002/FBT003: script helpers use bool flags
+# INP001: scripts/ is not a package
+# S603: subprocess calls in dev scripts are developer-controlled
+"scripts/**/*.py" = ["T201", "EXE001", "FBT001", "FBT002", "FBT003", "INP001", "C901", "BLE001", "S101", "S603", "TC001", "TC003", "PERF401"]

@@ -7,13 +7,16 @@ import json
 from dataclasses import dataclass
 from io import BytesIO, StringIO
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from lxml import etree
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
-from finestvx.core.models import Book
 from finestvx.core.serialization import book_to_mapping
+
+if TYPE_CHECKING:
+    from finestvx.core.models import Book
 
 __all__ = [
     "ExportArtifact",

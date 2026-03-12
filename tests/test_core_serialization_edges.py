@@ -136,7 +136,7 @@ class TestSerializationHelpers:
         with pytest.raises(TypeError, match="amount must be decimal text"):
             serialization_module._require_decimal(1, "amount")
         with pytest.raises(TypeError, match="decimal exponent must be int"):
-            serialization_module._decimal_precision(cast(Any, _FakeDecimalLike()))
+            serialization_module._decimal_precision(cast("Any", _FakeDecimalLike()))
 
     def test_public_deserializers_report_type_mismatches(self) -> None:
         """Public mapping loaders surface field-level typing errors."""

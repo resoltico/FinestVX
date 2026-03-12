@@ -3,20 +3,27 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 from decimal import Decimal
 from itertools import pairwise
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 from ftllexengine.analysis.graph import detect_cycles, make_cycle_key
 from ftllexengine.core.fiscal import FiscalCalendar, FiscalPeriod
-from ftllexengine.introspection.iso import CurrencyCode, get_currency, is_valid_currency_code
+from ftllexengine.introspection.iso import (
+    CurrencyCode,
+    get_currency_decimal_digits,
+    is_valid_currency_code,
+)
 from ftllexengine.runtime.function_bridge import FluentNumber
 
 from .enums import FiscalPeriodState, PostingSide, TransactionState
-from .types import AccountCode, BookCode, LegislativePackCode, TransactionReference
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from .types import AccountCode, BookCode, LegislativePackCode, TransactionReference
 
 __all__ = [
     "Account",
@@ -26,7 +33,7 @@ __all__ = [
     "LedgerEntry",
 ]
 
-_ZERO: Final[Decimal] = Decimal("0")
+_ZERO: Final[Decimal] = Decimal(0)
 _DEFAULT_PACK_CODE: Final[LegislativePackCode] = "lv.standard.2026"
 
 
@@ -96,7 +103,7 @@ def _require_decimal_ratio(value: object, field_name: str) -> Decimal | None:
     if not value.is_finite():
         msg = f"{field_name} must be finite"
         raise ValueError(msg)
-    if not _ZERO <= value <= Decimal("1"):
+    if not _ZERO <= value <= Decimal(1):
         msg = f"{field_name} must be between 0 and 1 inclusive"
         raise ValueError(msg)
     return value
@@ -389,15 +396,15 @@ class LedgerEntry:
             msg = "amount must be non-negative"
             raise ValueError(msg)
         object.__setattr__(self, "currency", _normalize_currency(self.currency, "currency"))
-        currency_info = get_currency(self.currency)
-        if currency_info is not None:
+        max_decimal_places = get_currency_decimal_digits(self.currency)
+        if max_decimal_places is not None:
             exponent = decimal_value.as_tuple().exponent
             if isinstance(exponent, int):
                 amount_decimal_places = max(-exponent, 0)
-                if amount_decimal_places > currency_info.decimal_digits:
+                if amount_decimal_places > max_decimal_places:
                     msg = (
                         f"amount has {amount_decimal_places} decimal places but "
-                        f"{self.currency} supports at most {currency_info.decimal_digits}"
+                        f"{self.currency} supports at most {max_decimal_places}"
                     )
                     raise ValueError(msg)
         object.__setattr__(

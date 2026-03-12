@@ -2,17 +2,21 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from typing import TYPE_CHECKING
 
 from ftllexengine.diagnostics.validation import WarningSeverity
 from ftllexengine.validation import validate_resource
 
-from finestvx.core.models import Book, JournalTransaction
 from finestvx.core.validation import validate_chart_of_accounts, validate_transaction_balance
-from finestvx.legislation.protocols import LegislativeValidationResult
-from finestvx.legislation.registry import LegislativePackRegistry
 
 from .reports import ValidationFinding, ValidationReport, ValidationSeverity
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from finestvx.core.models import Book, JournalTransaction
+    from finestvx.legislation.protocols import LegislativeValidationResult
+    from finestvx.legislation.registry import LegislativePackRegistry
 
 __all__ = [
     "validate_book",
@@ -48,19 +52,21 @@ def validate_book(book: Book) -> ValidationReport:
     for transaction in book.transactions:
         report = validate_transaction(book, transaction)
         findings.extend(report.findings)
-        for entry in transaction.entries:
-            if entry.account_code not in account_codes:
-                findings.append(
-                    ValidationFinding(
-                        code="BOOK_UNKNOWN_ACCOUNT_REFERENCE",
-                        message=(
-                            f"Transaction {transaction.reference} references unknown account "
-                            f"{entry.account_code}"
-                        ),
-                        severity=ValidationSeverity.ERROR,
-                        source="core.book",
-                    )
+        findings.extend(
+            [
+                ValidationFinding(
+                    code="BOOK_UNKNOWN_ACCOUNT_REFERENCE",
+                    message=(
+                        f"Transaction {transaction.reference} references unknown account "
+                        f"{entry.account_code}"
+                    ),
+                    severity=ValidationSeverity.ERROR,
+                    source="core.book",
                 )
+                for entry in transaction.entries
+                if entry.account_code not in account_codes
+            ]
+        )
     return ValidationReport(tuple(findings))
 
 
@@ -75,18 +81,17 @@ def validate_transaction(book: Book, transaction: JournalTransaction) -> Validat
             "core.transaction",
         )
 
-    findings: list[ValidationFinding] = []
     known_accounts = {account.code for account in book.accounts}
-    for entry in transaction.entries:
-        if entry.account_code not in known_accounts:
-            findings.append(
-                ValidationFinding(
-                    code="TRANSACTION_UNKNOWN_ACCOUNT",
-                    message=f"Unknown account code: {entry.account_code}",
-                    severity=ValidationSeverity.ERROR,
-                    source="core.transaction",
-                )
-            )
+    findings: list[ValidationFinding] = [
+        ValidationFinding(
+            code="TRANSACTION_UNKNOWN_ACCOUNT",
+            message=f"Unknown account code: {entry.account_code}",
+            severity=ValidationSeverity.ERROR,
+            source="core.transaction",
+        )
+        for entry in transaction.entries
+        if entry.account_code not in known_accounts
+    ]
     return ValidationReport(tuple(findings))
 
 
@@ -117,34 +122,37 @@ def validate_ftl_resource(
         known_msg_deps=known_msg_deps,
         known_term_deps=known_term_deps,
     )
-    findings: list[ValidationFinding] = []
-    for error in result.errors:
-        findings.append(
-            ValidationFinding(
-                code=error.code.name,
-                message=error.message,
-                severity=ValidationSeverity.ERROR,
-                source="ftl.resource",
-            )
+    findings: list[ValidationFinding] = [
+        ValidationFinding(
+            code=error.code.name,
+            message=error.message,
+            severity=ValidationSeverity.ERROR,
+            source="ftl.resource",
         )
-    for warning in result.warnings:
-        findings.append(
+        for error in result.errors
+    ]
+    findings.extend(
+        [
             ValidationFinding(
                 code=warning.code.name,
                 message=warning.message,
                 severity=_severity_from_warning(warning.severity),
                 source="ftl.resource",
             )
-        )
-    for annotation in result.annotations:
-        findings.append(
+            for warning in result.warnings
+        ]
+    )
+    findings.extend(
+        [
             ValidationFinding(
                 code="PARSE_JUNK",
                 message=annotation.message,
                 severity=ValidationSeverity.ERROR,
                 source="ftl.resource",
             )
-        )
+            for annotation in result.annotations
+        ]
+    )
     return ValidationReport(tuple(findings))
 
 

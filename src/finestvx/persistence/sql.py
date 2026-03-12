@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import re
-from string.templatelib import Template
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from string.templatelib import Template
 
 __all__ = [
     "quote_identifier",

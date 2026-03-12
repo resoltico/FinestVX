@@ -1,9 +1,3 @@
-"""Type stubs for the finestvx package.
-
-Declares types for lazy-loaded attributes and re-exported symbols.
-Mypy cannot infer types through __getattr__, so explicit declarations are required.
-"""
-
 # Core domain models
 # External re-exports (ftllexengine)
 from ftllexengine.introspection import get_cldr_version as get_cldr_version

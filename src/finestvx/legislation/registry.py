@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator
-
-from finestvx.core.types import LegislativePackCode
+from typing import TYPE_CHECKING
 
 from .lv.standard_2026 import LatviaStandard2026Pack
-from .protocols import ILegislativePack
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator
+
+    from finestvx.core.types import LegislativePackCode
+
+    from .protocols import ILegislativePack
 
 __all__ = [
     "LegislativePackRegistry",

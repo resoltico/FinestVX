@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from ftllexengine.analysis.graph import detect_cycles
 
@@ -15,7 +14,12 @@ from .models import (
     _validate_account_collection,
     _validate_transaction_entries,
 )
-from .types import AccountCode, CurrencyCode
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+    from decimal import Decimal
+
+    from .types import AccountCode, CurrencyCode
 
 __all__ = [
     "account_dependency_map",

@@ -141,23 +141,15 @@ class TestPersistenceAndRuntimeEdges:
             assert runtime_snapshot.writer_thread_alive is True
             assert runtime_snapshot.store.book_count == 1
             assert runtime_snapshot.store.audit_row_count >= 4
-            with pytest.raises(TypeError, match="create_book payload must be Book"):
-                runtime._submit(
-                    kind="create_book",
-                    payload=("demo-book", build_posted_transaction(reference="TX-2026-4003")),
-                    audit_context=AuditContext(actor="tester", reason="post"),
-                )
-            with pytest.raises(TypeError, match="append_transaction payload must be tuple"):
-                runtime._submit(
-                    kind="append_transaction",
-                    payload=build_sample_book(),
-                    audit_context=AuditContext(actor="tester", reason="post"),
-                )
+            with pytest.raises(TypeError, match="command must be a supported write command"):
+                runtime._submit(("demo-book", build_posted_transaction(reference="TX-2026-4003")))
+            with pytest.raises(TypeError, match="command must be a supported write command"):
+                runtime._submit(object())
 
         runtime = object.__new__(LedgerRuntimeClass)
         runtime._started = False
         fake_store = _FakeStore()
-        runtime._store = cast(Any, fake_store)
+        runtime._store = cast("Any", fake_store)
         LedgerRuntimeClass.close(runtime)
         assert fake_store.closed is True
 

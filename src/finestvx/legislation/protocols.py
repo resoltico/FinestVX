@@ -5,18 +5,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
-from ftllexengine.introspection.iso import (
-    CurrencyCode,
-    TerritoryCode,
-    is_valid_currency_code,
-    is_valid_territory_code,
-)
-from ftllexengine.runtime.function_bridge import FunctionRegistry
-
-from finestvx.core.models import Book, JournalTransaction
-from finestvx.core.types import LegislativePackCode
+from ftllexengine.introspection.iso import is_valid_currency_code, is_valid_territory_code
 
 if TYPE_CHECKING:
+    from ftllexengine.introspection.iso import CurrencyCode, TerritoryCode
+    from ftllexengine.runtime.function_bridge import FunctionRegistry
+
+    from finestvx.core.models import Book, JournalTransaction
+    from finestvx.core.types import LegislativePackCode
     from finestvx.localization import LocalizationService
 
 __all__ = [

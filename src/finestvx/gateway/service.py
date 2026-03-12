@@ -3,17 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
-from finestvx.core.models import Book, JournalTransaction
 from finestvx.export import ExportArtifact, LedgerExporter
 from finestvx.legislation import (
     LegislativeInterpreterRunner,
     LegislativePackRegistry,
     create_default_pack_registry,
 )
-from finestvx.localization import LocalizationService
 from finestvx.persistence import AuditContext, DatabaseSnapshot
 from finestvx.runtime import LedgerRuntime, RuntimeConfig, RuntimeDebugSnapshot
 from finestvx.validation import (
@@ -23,6 +20,12 @@ from finestvx.validation import (
     validate_legislative_transaction,
     validate_transaction,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from finestvx.core.models import Book, JournalTransaction
+    from finestvx.localization import LocalizationService
 
 __all__ = [
     "FinestVXService",

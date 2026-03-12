@@ -47,7 +47,7 @@ class TestCoreModelHelpers:
             models_module._amount_as_decimal("1.00")
 
         integer_amount = FluentNumber(value=10, formatted="10", precision=0)
-        assert models_module._amount_as_decimal(integer_amount) == Decimal("10")
+        assert models_module._amount_as_decimal(integer_amount) == Decimal(10)
 
         with pytest.raises(ValueError, match="amount value must be finite"):
             models_module._amount_as_decimal(
@@ -236,10 +236,10 @@ class TestLedgerEntryCurrencyPrecision:
         entry = LedgerEntry(
             account_code="1000",
             side=PostingSide.DEBIT,
-            amount=fluent_number_from_decimal(Decimal("1000")),
+            amount=fluent_number_from_decimal(Decimal(1000)),
             currency="JPY",
         )
-        assert entry.decimal_value == Decimal("1000")
+        assert entry.decimal_value == Decimal(1000)
 
     def test_kwd_accepts_three_decimal_places(self) -> None:
         """KWD (Kuwaiti Dinar) supports 3 decimal places."""
@@ -261,7 +261,7 @@ class TestCoreModelConstructors:
             Account(
                 code="1000",
                 name="Cash",
-                normal_side=cast(Any, "Dr"),
+                normal_side=cast("Any", "Dr"),
                 currency="EUR",
             )
 
@@ -269,7 +269,7 @@ class TestCoreModelConstructors:
             LedgerEntry(
                 account_code="1000",
                 side=PostingSide.DEBIT,
-                amount=cast(Any, "1.00"),
+                amount=cast("Any", "1.00"),
                 currency="EUR",
             )
 
@@ -279,7 +279,7 @@ class TestCoreModelConstructors:
                 posted_at=_POSTED_AT,
                 description="Bad entries",
                 state=TransactionState.DRAFT,
-                entries=cast(Any, "not-a-sequence"),
+                entries=cast("Any", "not-a-sequence"),
             )
 
         with pytest.raises(ValueError, match="reversal_of must reference a different transaction"):
@@ -315,7 +315,7 @@ class TestCoreModelConstructors:
         """Book and period wrappers reject invalid field types and states."""
         with pytest.raises(TypeError, match="period must be FiscalPeriod"):
             BookPeriod(
-                period=cast(Any, "2026-Q1"),
+                period=cast("Any", "2026-Q1"),
                 start_date=date(2026, 1, 1),
                 end_date=date(2026, 1, 31),
             )
@@ -324,7 +324,7 @@ class TestCoreModelConstructors:
                 period=FiscalPeriod(fiscal_year=2026, quarter=1, month=1),
                 start_date=date(2026, 1, 1),
                 end_date=date(2026, 1, 31),
-                state=cast(Any, "open"),
+                state=cast("Any", "open"),
             )
         with pytest.raises(TypeError, match="transactions must contain JournalTransaction objects"):
             Book(
@@ -333,5 +333,5 @@ class TestCoreModelConstructors:
                 base_currency="EUR",
                 fiscal_calendar=FiscalCalendar(start_month=1),
                 accounts=(),
-                transactions=cast(Any, (object(),)),
+                transactions=cast("Any", (object(),)),
             )

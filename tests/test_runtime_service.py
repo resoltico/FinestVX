@@ -10,7 +10,7 @@ import pytest
 
 from finestvx.persistence import AuditContext, PersistenceConfig
 from finestvx.runtime import LedgerRuntime, RuntimeConfig
-from finestvx.runtime.service import _WriteCommand
+from finestvx.runtime.service import _CreateBookCommand
 from tests.support.book_factory import build_posted_transaction, build_sample_book
 
 
@@ -58,9 +58,8 @@ class TestLedgerRuntime:
         runtime._store = mock_store
 
         future: Future[None] = Future()
-        command = _WriteCommand(
-            kind="create_book",
-            payload=mock_book,
+        command = _CreateBookCommand(
+            book=mock_book,
             audit_context=AuditContext(actor="tester", reason="inject"),
             future=future,
         )

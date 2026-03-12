@@ -4,23 +4,28 @@ from __future__ import annotations
 
 import json
 import time
-from collections.abc import Buffer, Iterable, Iterator
+from collections.abc import Buffer
 from compression import zstd
 from contextlib import contextmanager
 from dataclasses import dataclass
 from hashlib import blake2b
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import apsw
 
 from finestvx.core.enums import TransactionState
-from finestvx.core.models import Book, JournalTransaction
 from finestvx.core.serialization import book_from_mapping, book_to_mapping
 from finestvx.core.validation import validate_chart_of_accounts, validate_transaction_balance
-from finestvx.legislation.protocols import LegislativeValidationResult
-from finestvx.persistence.config import AuditContext, DatabaseSnapshot, PersistenceConfig
+from finestvx.persistence.config import DatabaseSnapshot
 from finestvx.persistence.schema import apply_sqlite_pragmas, install_schema
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator
+
+    from finestvx.core.models import Book, JournalTransaction
+    from finestvx.legislation.protocols import LegislativeValidationResult
+    from finestvx.persistence.config import AuditContext, PersistenceConfig
 
 __all__ = [
     "AuditLogRecord",
@@ -129,7 +134,7 @@ class SqliteLedgerStore:
         if row is None or isinstance(row[0], bool) or not isinstance(row[0], int):
             msg = f"Expected scalar integer result for SQL query: {sql}"
             raise TypeError(msg)
-        return cast(int, row[0])
+        return cast("int", row[0])
 
     def _register_sql_functions(self) -> None:
         """Expose deterministic helper functions to SQLite triggers."""
@@ -364,7 +369,7 @@ class SqliteLedgerStore:
     def list_book_codes(self) -> tuple[str, ...]:
         """Return all known book codes in deterministic order."""
         return tuple(
-            cast(str, row[0])
+            cast("str", row[0])
             for row in self._fetchall(
                 "SELECT book_code FROM books ORDER BY book_code"
             )
@@ -384,50 +389,48 @@ class SqliteLedgerStore:
             msg = f"Unknown book: {book_code}"
             raise KeyError(msg)
 
-        accounts: list[dict[str, object]] = []
-        for row in self._fetchall(
-            """
-            SELECT code, name, normal_side, currency, parent_code, allow_posting, active
-            FROM accounts
-            WHERE book_code = ?
-            ORDER BY code
-            """,
-            (book_code,),
-        ):
-            accounts.append(
-                {
-                    "code": row[0],
-                    "name": row[1],
-                    "normal_side": row[2],
-                    "currency": row[3],
-                    "parent_code": row[4],
-                    "allow_posting": bool(row[5]),
-                    "active": bool(row[6]),
-                }
+        accounts = [
+            {
+                "code": row[0],
+                "name": row[1],
+                "normal_side": row[2],
+                "currency": row[3],
+                "parent_code": row[4],
+                "allow_posting": bool(row[5]),
+                "active": bool(row[6]),
+            }
+            for row in self._fetchall(
+                """
+                SELECT code, name, normal_side, currency, parent_code, allow_posting, active
+                FROM accounts
+                WHERE book_code = ?
+                ORDER BY code
+                """,
+                (book_code,),
             )
+        ]
 
-        periods: list[dict[str, object]] = []
-        for row in self._fetchall(
-            """
-            SELECT fiscal_year, quarter, month, start_date, end_date, state
-            FROM periods
-            WHERE book_code = ?
-            ORDER BY start_date, end_date, fiscal_year, quarter, month
-            """,
-            (book_code,),
-        ):
-            periods.append(
-                {
-                    "period": {
-                        "fiscal_year": row[0],
-                        "quarter": row[1],
-                        "month": row[2],
-                    },
-                    "start_date": row[3],
-                    "end_date": row[4],
-                    "state": row[5],
-                }
+        periods = [
+            {
+                "period": {
+                    "fiscal_year": row[0],
+                    "quarter": row[1],
+                    "month": row[2],
+                },
+                "start_date": row[3],
+                "end_date": row[4],
+                "state": row[5],
+            }
+            for row in self._fetchall(
+                """
+                SELECT fiscal_year, quarter, month, start_date, end_date, state
+                FROM periods
+                WHERE book_code = ?
+                ORDER BY start_date, end_date, fiscal_year, quarter, month
+                """,
+                (book_code,),
             )
+        ]
 
         transactions: list[dict[str, object]] = []
         for tx_row in self._fetchall(
@@ -440,34 +443,33 @@ class SqliteLedgerStore:
             """,
             (book_code,),
         ):
-            entries: list[dict[str, object]] = []
-            for entry_row in self._fetchall(
-                """
-                SELECT account_code, side, amount, currency, description, tax_rate
-                FROM entries
-                WHERE book_code = ? AND transaction_reference = ?
-                ORDER BY line_no
-                """,
-                (book_code, tx_row[0]),
-            ):
-                entries.append(
-                    {
-                        "account_code": entry_row[0],
-                        "side": entry_row[1],
-                        "amount": entry_row[2],
-                        "currency": entry_row[3],
-                        "description": entry_row[4],
-                        "tax_rate": entry_row[5],
-                    }
+            entries = [
+                {
+                    "account_code": entry_row[0],
+                    "side": entry_row[1],
+                    "amount": entry_row[2],
+                    "currency": entry_row[3],
+                    "description": entry_row[4],
+                    "tax_rate": entry_row[5],
+                }
+                for entry_row in self._fetchall(
+                    """
+                    SELECT account_code, side, amount, currency, description, tax_rate
+                    FROM entries
+                    WHERE book_code = ? AND transaction_reference = ?
+                    ORDER BY line_no
+                    """,
+                    (book_code, tx_row[0]),
                 )
+            ]
             period_payload: dict[str, int] | None
             if tx_row[4] is None:
                 period_payload = None
             else:
                 period_payload = {
-                    "fiscal_year": cast(int, tx_row[4]),
-                    "quarter": cast(int, tx_row[5]),
-                    "month": cast(int, tx_row[6]),
+                    "fiscal_year": cast("int", tx_row[4]),
+                    "quarter": cast("int", tx_row[5]),
+                    "month": cast("int", tx_row[6]),
                 }
             transactions.append(
                 {
@@ -509,7 +511,7 @@ class SqliteLedgerStore:
             sql += " LIMIT ?"
             bindings = (limit,)
         return tuple(
-            AuditLogRecord(*cast(AuditLogRow, row))
+            AuditLogRecord(*cast("AuditLogRow", row))
             for row in self._fetchall(sql, bindings)
         )
 
@@ -584,12 +586,10 @@ class SqliteLedgerStore:
 
     def _wal_checkpoint_stats(self) -> tuple[int, int]:
         """Return WAL checkpoint statistics as a normalized integer pair."""
-        # apsw.Connection.wal_checkpoint() returns (wal_frames, checkpointed_frames) at
-        # runtime. APSW's incomplete C-extension stubs prevent pylint from inferring the
-        # subscriptable return type; subscript access is correct and verified by tests.
-        checkpoint = self._connection.wal_checkpoint(mode=apsw.SQLITE_CHECKPOINT_TRUNCATE)
-        wal_frames = checkpoint[0]  # pylint: disable=unsubscriptable-object
-        checkpointed_frames = checkpoint[1]  # pylint: disable=unsubscriptable-object
+        # APSW exposes checkpoint counts as a runtime tuple even though its stubs are sparse.
+        wal_frames, checkpointed_frames = self._connection.wal_checkpoint(
+            mode=apsw.SQLITE_CHECKPOINT_TRUNCATE
+        )
         return (wal_frames, checkpointed_frames)
 
     def create_snapshot(

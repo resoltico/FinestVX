@@ -39,7 +39,7 @@ class TestValidationServiceEdges:
             "validate_chart_of_accounts",
             raise_chart_error,
         )
-        chart_report = validate_book(cast(Any, SimpleNamespace(accounts=(), transactions=())))
+        chart_report = validate_book(cast("Any", SimpleNamespace(accounts=(), transactions=())))
         assert chart_report.findings[0].code == "BOOK_CHART_INVALID"
 
         account = Account(
@@ -54,7 +54,7 @@ class TestValidationServiceEdges:
         )
         monkeypatch.setattr(validation_module, "validate_chart_of_accounts", accept_chart)
 
-        report = validate_book(cast(Any, partial_book))
+        report = validate_book(cast("Any", partial_book))
 
         assert {finding.code for finding in report.findings} == {
             "TRANSACTION_UNKNOWN_ACCOUNT",
@@ -98,7 +98,7 @@ class TestValidationServiceEdges:
             )
         )
         missing_account_report = validate_transaction(
-            cast(Any, partial_book),
+            cast("Any", partial_book),
             build_posted_transaction(reference="TX-2026-3003"),
         )
         assert missing_account_report.findings[0].code == "TRANSACTION_UNKNOWN_ACCOUNT"
