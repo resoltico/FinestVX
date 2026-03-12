@@ -11,7 +11,7 @@ from finestvx.legislation import (
     LegislativePackRegistry,
     create_default_pack_registry,
 )
-from finestvx.persistence import AuditContext, DatabaseSnapshot
+from finestvx.persistence import AuditContext, DatabaseSnapshot, StoreWriteReceipt
 from finestvx.runtime import LedgerRuntime, RuntimeConfig, RuntimeDebugSnapshot
 from finestvx.validation import (
     ValidationFinding,
@@ -25,12 +25,14 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from finestvx.core.models import Book, JournalTransaction
+    from finestvx.legislation import LegislativeValidationResult
     from finestvx.localization import LocalizationService
 
 __all__ = [
     "FinestVXService",
     "FinestVXServiceConfig",
     "GatewayDebugSnapshot",
+    "PostedTransactionResult",
 ]
 
 ExportFormat = Literal["json", "csv", "xml", "pdf"]
@@ -49,6 +51,15 @@ class GatewayDebugSnapshot:
 
     runtime: RuntimeDebugSnapshot
     registered_pack_codes: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class PostedTransactionResult:
+    """Ledger and legislative receipts for one posted transaction."""
+
+    ledger_write: StoreWriteReceipt
+    legislative_result: LegislativeValidationResult
+    legislative_write: StoreWriteReceipt
 
 
 @dataclass(slots=True)
@@ -71,9 +82,9 @@ class FinestVXService:
         """Close runtime resources held by the service."""
         self._runtime.close()
 
-    def create_book(self, book: Book, *, audit_context: AuditContext) -> None:
+    def create_book(self, book: Book, *, audit_context: AuditContext) -> StoreWriteReceipt:
         """Persist a new book."""
-        self._runtime.create_book(book, audit_context=audit_context)
+        return self._runtime.create_book(book, audit_context=audit_context)
 
     def post_transaction(
         self,
@@ -81,9 +92,13 @@ class FinestVXService:
         transaction: JournalTransaction,
         *,
         audit_context: AuditContext,
-    ) -> None:
+    ) -> PostedTransactionResult:
         """Append a posted transaction and audit its isolated legislative result."""
-        self._runtime.append_transaction(book_code, transaction, audit_context=audit_context)
+        ledger_write = self._runtime.append_transaction(
+            book_code,
+            transaction,
+            audit_context=audit_context,
+        )
         book = self.get_book(book_code)
         result = self.interpreter_runner.validate(book.legislative_pack, book, transaction)
         legislative_audit_context = AuditContext(
@@ -91,11 +106,16 @@ class FinestVXService:
             reason=f"{audit_context.reason}:legislative-validation",
             session_id=audit_context.session_id,
         )
-        self._runtime.append_legislative_result(
+        legislative_write = self._runtime.append_legislative_result(
             book_code,
             transaction.reference,
             result,
             audit_context=legislative_audit_context,
+        )
+        return PostedTransactionResult(
+            ledger_write=ledger_write,
+            legislative_result=result,
+            legislative_write=legislative_write,
         )
 
     def get_book(self, book_code: str) -> Book:

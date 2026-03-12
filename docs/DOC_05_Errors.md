@@ -1,8 +1,8 @@
 ---
 afad: "3.3"
-version: "0.1.0"
+version: "0.2.0"
 domain: ERRORS
-updated: "2026-03-09"
+updated: "2026-03-12"
 route:
   keywords: [error model, integrity exceptions, validation reports, apsw errors, localization boot failure, audit enforcement]
   questions: ["what errors does finestvx raise now?", "how do validation reports differ from exceptions?", "how do localization failures surface?", "what happens on append-only violations?", "which FTLLexEngine exceptions are active?"]
@@ -31,8 +31,9 @@ Active interactions:
 
 ### Concurrency Timeout Errors
 - `RWLock.read(timeout=...)` and `RWLock.write(timeout=...)` raise `TimeoutError` when lock acquisition exceeds the configured timeout.
-- This propagates from every `LedgerRuntime` method: `create_book`, `append_transaction`, `append_legislative_result`, `get_book_snapshot`, `list_book_codes`, `iter_audit_log`, `create_snapshot`, and `debug_snapshot`.
-- `RuntimeConfig.read_lock_timeout` and `write_lock_timeout` control these thresholds; `None` disables the timeout.
+- Public `LedgerRuntime` methods acquire `RWLock.read(timeout=read_lock_timeout)` as a lifecycle gate.
+- `LedgerRuntime.close()` acquires `RWLock.write(timeout=write_lock_timeout)` for exclusive shutdown.
+- Store reader-pool checkout timeouts surface as `TimeoutError` from `SqliteLedgerStore`.
 
 ## Validation Result vs Exception
 

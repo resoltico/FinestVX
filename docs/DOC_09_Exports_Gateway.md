@@ -1,11 +1,11 @@
 ---
 afad: "3.3"
-version: "0.1.0"
+version: "0.2.0"
 domain: SECONDARY
-updated: "2026-03-09"
+updated: "2026-03-12"
 route:
-  keywords: [export artifact, ledger exporter, json csv xml pdf, runtime config, ledger runtime, runtime debug snapshot, service facade, finestvx service, service config, gateway debug snapshot, post transaction, legislative audit]
-  questions: ["how are finestvx artifacts exported?", "what does the service facade do?", "how does runtime orchestration work?", "what debug snapshots exist?", "how are legislative results audited after posting?", "what is RuntimeConfig?"]
+  keywords: [export artifact, ledger exporter, runtime config, ledger runtime, posted transaction result, service facade, gateway debug snapshot, runtime debug snapshot]
+  questions: ["how does LedgerRuntime work now?", "what does FinestVXService return on writes?", "what runtime debug data is available?", "how are artifacts exported?", "what is PostedTransactionResult?"]
 ---
 
 # FinestVX Export and Gateway Reference
@@ -26,9 +26,8 @@ class ExportArtifact:
 ```
 
 ### Constraints
-- `format_name`: one of `"json"`, `"csv"`, `"xml"`, `"pdf"`.
-- `media_type`: MIME type string (`"application/json"`, `"text/csv"`, `"application/xml"`, `"application/pdf"`).
-- `content`: deterministic bytes; same inputs always produce identical output.
+- `format_name` is one of `"json"`, `"csv"`, `"xml"`, `"pdf"`.
+- `content` is deterministic for identical `Book` inputs.
 
 ---
 
@@ -48,18 +47,15 @@ class LedgerExporter:
 ```
 
 ### Constraints
-- Constructor: compiles the bundled `ledger.xsd` once; raises if schema file is missing.
-- `to_json`: stable key ordering, compact separators, UTF-8.
-- `to_csv`: deterministic row order following transaction and entry insertion order.
-- `to_xml`: validated against the bundled XSD; raises `lxml.etree.DocumentInvalid` on violation.
-- `validate_xml`: re-validates raw XML bytes against the same XSD.
-- `to_pdf`: uses ReportLab `invariant=1` and `pageCompression=0` for deterministic output.
+- `to_json()` uses stable key ordering and compact UTF-8 output.
+- `to_xml()` validates against the bundled XSD.
+- `to_pdf()` uses deterministic ReportLab settings.
 
 ---
 
 ## `RuntimeConfig`
 
-Immutable configuration for the single-writer `LedgerRuntime`.
+Immutable configuration for the `LedgerRuntime`.
 
 ### Signature
 ```python
@@ -74,14 +70,14 @@ class RuntimeConfig:
 
 ### Constraints
 - `queue_timeout` and `poll_interval` must be positive.
-- `read_lock_timeout` / `write_lock_timeout`: passed to `RWLock.read()` / `RWLock.write()`; `None` means no timeout.
-- Explicit timeouts on all acquisition paths prevent indefinite stalls.
+- Public runtime methods acquire `RWLock.read(timeout=read_lock_timeout)` as a lifecycle gate.
+- `close()` acquires `RWLock.write(timeout=write_lock_timeout)` for exclusive shutdown.
 
 ---
 
 ## `RuntimeDebugSnapshot`
 
-Immutable non-invasive runtime snapshot for production introspection.
+Immutable runtime snapshot for production introspection.
 
 ### Signature
 ```python
@@ -98,15 +94,15 @@ class RuntimeDebugSnapshot:
 ```
 
 ### Constraints
-- `reader_count`, `writer_active`, `writers_waiting`: live `RWLock` observability fields.
-- `queue_size`: number of pending write commands at snapshot time.
-- `store`: embedded `StoreDebugSnapshot` from the underlying `SqliteLedgerStore`.
+- `reader_count`, `writer_active`, and `writers_waiting` describe the lifecycle `RWLock`.
+- `queue_size` is the pending writer-command count.
+- `store` embeds the full persistence-layer telemetry snapshot.
 
 ---
 
 ## `LedgerRuntime`
 
-Single-writer, multi-reader runtime coordinating all store access via a dedicated write thread and `RWLock`.
+Single-writer runtime that queues mutations and serves reads from the store reader pool.
 
 ### Signature
 ```python
@@ -116,9 +112,9 @@ class LedgerRuntime:
     def __exit__(self, ...) -> None: ...
     def start(self) -> None: ...
     def close(self) -> None: ...
-    def create_book(self, book: Book, *, audit_context: AuditContext) -> None: ...
-    def append_transaction(self, book_code: str, transaction: JournalTransaction, *, audit_context: AuditContext) -> None: ...
-    def append_legislative_result(self, book_code: str, transaction_reference: str, result: LegislativeValidationResult, *, audit_context: AuditContext) -> None: ...
+    def create_book(self, book: Book, *, audit_context: AuditContext) -> StoreWriteReceipt: ...
+    def append_transaction(self, book_code: str, transaction: JournalTransaction, *, audit_context: AuditContext) -> StoreWriteReceipt: ...
+    def append_legislative_result(self, book_code: str, transaction_reference: str, result: LegislativeValidationResult, *, audit_context: AuditContext) -> StoreWriteReceipt: ...
     def get_book_snapshot(self, book_code: str) -> Book: ...
     def list_book_codes(self) -> tuple[str, ...]: ...
     def iter_audit_log(self, *, limit: int | None = None) -> tuple[AuditLogRecord, ...]: ...
@@ -127,13 +123,11 @@ class LedgerRuntime:
 ```
 
 ### Constraints
-- Constructor: creates `SqliteLedgerStore`, `RWLock`, `Queue`, and calls `start()`.
-- `start()`: starts the background write thread; no-op if already started.
-- Supports context-manager protocol (`with LedgerRuntime(config) as runtime:`).
-- Write methods (`create_book`, `append_transaction`, `append_legislative_result`): submitted via `Queue`; block until the write thread completes or `queue_timeout` expires.
-- Read methods (`get_book_snapshot`, `list_book_codes`, `iter_audit_log`, `debug_snapshot`): acquire `RWLock.read` with `read_lock_timeout`.
-- `create_snapshot`: acquires `RWLock.write` for the duration.
-- `close`: signals the write thread to stop, joins it, closes the store.
+- Constructor creates `SqliteLedgerStore`, `RWLock`, `Queue`, and starts the writer thread.
+- Write methods enqueue typed command dataclasses and return `StoreWriteReceipt`.
+- Read methods use `SqliteLedgerStore` read-only connections while holding only the lifecycle read lock.
+- `create_snapshot()` is also queued to the writer thread; it is not a direct caller-side write lock.
+- `close()` stops the writer thread, joins it, and closes the store.
 
 ---
 
@@ -166,42 +160,61 @@ class GatewayDebugSnapshot:
 ```
 
 ### Constraints
-- `runtime`: embedded `RuntimeDebugSnapshot`.
-- `registered_pack_codes`: sorted tuple from `LegislativePackRegistry.available_pack_codes()`.
+- `runtime` is the embedded runtime snapshot.
+- `registered_pack_codes` comes from `LegislativePackRegistry.available_pack_codes()`.
+
+---
+
+## `PostedTransactionResult`
+
+Immutable service-level write result for one posted transaction.
+
+### Signature
+```python
+@dataclass(frozen=True, slots=True)
+class PostedTransactionResult:
+    ledger_write: StoreWriteReceipt
+    legislative_result: LegislativeValidationResult
+    legislative_write: StoreWriteReceipt
+```
+
+### Constraints
+- `ledger_write` is the receipt for the transaction insert.
+- `legislative_result` is the validation result produced after the ledger write committed.
+- `legislative_write` is the receipt for the follow-up audit-log insert.
 
 ---
 
 ## `FinestVXService`
 
-High-level orchestration facade coordinating persistence, validation, legislation, and export.
+High-level orchestration facade for persistence, validation, legislation, and export.
 
 ### Signature
 ```python
 @dataclass(slots=True)
 class FinestVXService:
     config: FinestVXServiceConfig
-    registry: LegislativePackRegistry  # default: create_default_pack_registry()
-    exporter: LedgerExporter  # default: LedgerExporter()
-    interpreter_runner: LegislativeInterpreterRunner  # default: LegislativeInterpreterRunner()
+    registry: LegislativePackRegistry
+    exporter: LedgerExporter
+    interpreter_runner: LegislativeInterpreterRunner
 
     def close(self) -> None: ...
-    def create_book(self, book: Book, *, audit_context: AuditContext) -> None: ...
-    def post_transaction(self, book_code: str, transaction: JournalTransaction, *, audit_context: AuditContext) -> None: ...
+    def create_book(self, book: Book, *, audit_context: AuditContext) -> StoreWriteReceipt: ...
+    def post_transaction(self, book_code: str, transaction: JournalTransaction, *, audit_context: AuditContext) -> PostedTransactionResult: ...
     def get_book(self, book_code: str) -> Book: ...
     def list_book_codes(self) -> tuple[str, ...]: ...
     def validate_transaction(self, book_code: str, transaction: JournalTransaction) -> ValidationReport: ...
     def validate_transaction_isolated(self, book_code: str, transaction: JournalTransaction) -> ValidationReport: ...
-    def export_book(self, book_code: str, format_name: Literal["json","csv","xml","pdf"]) -> ExportArtifact: ...
+    def export_book(self, book_code: str, format_name: Literal["json", "csv", "xml", "pdf"]) -> ExportArtifact: ...
     def create_snapshot(self, output_path: Path | str, *, compress: bool = True) -> DatabaseSnapshot: ...
     def get_pack_localization(self, pack_code: str) -> LocalizationService: ...
     def debug_snapshot(self) -> GatewayDebugSnapshot: ...
 ```
 
 ### Constraints
-- Constructor (`__post_init__`): creates and starts `LedgerRuntime`.
-- `post_transaction`: persists transaction first, then runs isolated legislative validation, then appends the result to `audit_log` as `table_name == "legislative_validation"`.
-- `validate_transaction`: combines core validation and in-process legislative validation.
-- `validate_transaction_isolated`: combines core validation and subinterpreter legislative validation.
-- `export_book`: delegates to `LedgerExporter`; format must be one of the four supported values.
-- `get_pack_localization`: raises `KeyError` for unknown pack codes.
-- `close`: must be called (or use as context manager) to release runtime resources.
+- `create_book()` forwards the runtime receipt from the queued writer thread.
+- `post_transaction()` persists the transaction, runs legislative validation, then appends the legislative audit row and returns `PostedTransactionResult`.
+- `validate_transaction()` combines core validation with in-process legislative validation.
+- `validate_transaction_isolated()` combines core validation with subinterpreter legislative validation.
+- `export_book()` delegates to `LedgerExporter`.
+- `close()` must be called to release runtime resources.

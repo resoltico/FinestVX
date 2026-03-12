@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from ftllexengine import clear_module_caches
+from ftllexengine import validate_message_variables as validate_ftl_message_variables
 from ftllexengine.integrity import IntegrityCheckFailedError, IntegrityContext, SyntaxIntegrityError
 from ftllexengine.localization.loading import PathResourceLoader
 from ftllexengine.localization.orchestrator import FluentLocalization
@@ -16,10 +17,13 @@ from finestvx.persistence.config import MANDATED_CACHE_CONFIG
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from ftllexengine import MessageVariableValidationResult
     from ftllexengine.localization.loading import FallbackInfo, LoadSummary
     from ftllexengine.localization.orchestrator import LocalizationCacheStats
+    from ftllexengine.runtime.cache import WriteLogEntry
     from ftllexengine.runtime.cache_config import CacheConfig
     from ftllexengine.runtime.value_types import FluentValue
+    from ftllexengine.syntax.ast import Message, Term
 
 __all__ = [
     "LocalizationConfig",
@@ -140,6 +144,35 @@ class LocalizationService:
             )
             raise IntegrityCheckFailedError(msg, context=context)
 
+    @staticmethod
+    def _build_missing_message_error(message_id: str) -> IntegrityCheckFailedError:
+        """Build the standard integrity error for absent message IDs."""
+        context = IntegrityContext(
+            component="localization",
+            operation="boot-schema-validate",
+            key=message_id,
+            actual="not found",
+        )
+        msg = f"Schema validation: message {message_id!r} not found in any locale"
+        return IntegrityCheckFailedError(msg, context=context)
+
+    @staticmethod
+    def _raise_for_schema_mismatch(result: MessageVariableValidationResult) -> None:
+        """Raise the integrity error for a structured schema mismatch result."""
+        parts: list[str] = []
+        if result.missing_variables:
+            parts.append(f"missing={sorted(result.missing_variables)!r}")
+        if result.extra_variables:
+            parts.append(f"extra={sorted(result.extra_variables)!r}")
+        context = IntegrityContext(
+            component="localization",
+            operation="boot-schema-validate",
+            key=result.message_id,
+            actual=f"declared={sorted(result.declared_variables)!r}",
+        )
+        msg = f"FTL message {result.message_id!r} variable mismatch: {', '.join(parts)}"
+        raise IntegrityCheckFailedError(msg, context=context)
+
     def _validate_message_schemas(self, schemas: dict[str, frozenset[str]]) -> None:
         """Validate each declared message's variables against the expected schema.
 
@@ -148,33 +181,9 @@ class LocalizationService:
                 or its declared variables do not match the expected set exactly.
         """
         for message_id, expected_vars in schemas.items():
-            try:
-                declared_vars = self._localization.get_message_variables(message_id)
-            except KeyError:
-                context = IntegrityContext(
-                    component="localization",
-                    operation="boot-schema-validate",
-                    key=message_id,
-                    actual="not found",
-                )
-                msg = f"Schema validation: message {message_id!r} not found in any locale"
-                raise IntegrityCheckFailedError(msg, context=context) from None
-            missing_vars = expected_vars - declared_vars
-            extra_vars = declared_vars - expected_vars
-            if missing_vars or extra_vars:
-                parts: list[str] = []
-                if missing_vars:
-                    parts.append(f"missing={sorted(missing_vars)!r}")
-                if extra_vars:
-                    parts.append(f"extra={sorted(extra_vars)!r}")
-                context = IntegrityContext(
-                    component="localization",
-                    operation="boot-schema-validate",
-                    key=message_id,
-                    actual=f"declared={sorted(declared_vars)!r}",
-                )
-                msg = f"FTL message {message_id!r} variable mismatch: {', '.join(parts)}"
-                raise IntegrityCheckFailedError(msg, context=context)
+            result = self.validate_message_variables(message_id, expected_vars)
+            if not result.is_valid:
+                self._raise_for_schema_mismatch(result)
 
     @property
     def summary(self) -> LoadSummary:
@@ -185,6 +194,16 @@ class LocalizationService:
     def fallback_events(self) -> tuple[FallbackInfo, ...]:
         """Return all recorded locale-fallback events."""
         return tuple(self._fallback_events)
+
+    @property
+    def cache_enabled(self) -> bool:
+        """Return whether FTLLexEngine format caching is active."""
+        return self._localization.cache_enabled
+
+    @property
+    def cache_config(self) -> CacheConfig | None:
+        """Return the active FTLLexEngine cache configuration."""
+        return self._localization.cache_config
 
     def format_value(
         self,
@@ -207,6 +226,33 @@ class LocalizationService:
     def add_function(self, name: str, func: Callable[..., FluentValue]) -> None:
         """Register a custom function across all bundle instances."""
         self._localization.add_function(name, func)
+
+    def get_message(self, message_id: str) -> Message | None:
+        """Return the highest-priority message AST node from the fallback chain."""
+        return self._localization.get_message(message_id)
+
+    def get_term(self, term_id: str) -> Term | None:
+        """Return the highest-priority term AST node from the fallback chain."""
+        return self._localization.get_term(term_id)
+
+    def validate_message_variables(
+        self,
+        message_id: str,
+        expected_variables: frozenset[str] | set[str],
+    ) -> MessageVariableValidationResult:
+        """Validate a message's declared FTL variables against an expected schema."""
+        message = self.get_message(message_id)
+        if message is None:
+            raise self._build_missing_message_error(message_id)
+        return validate_ftl_message_variables(message, expected_variables)
+
+    def clear_cache(self) -> None:
+        """Clear all initialized FTLLexEngine bundle format caches."""
+        self._localization.clear_cache()
+
+    def get_cache_audit_log(self) -> dict[str, tuple[WriteLogEntry, ...]] | None:
+        """Return immutable per-locale FTLLexEngine cache audit logs."""
+        return self._localization.get_cache_audit_log()
 
     def get_cache_stats(self) -> LocalizationCacheStats | None:
         """Return aggregated cache statistics across all loaded bundles."""

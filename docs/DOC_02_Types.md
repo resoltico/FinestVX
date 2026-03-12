@@ -1,8 +1,8 @@
 ---
 afad: "3.3"
-version: "0.1.0"
+version: "0.2.0"
 domain: TYPES
-updated: "2026-03-09"
+updated: "2026-03-12"
 route:
   keywords: [posting side, transaction state, fiscal period state, account code, book code, legislative pack code, transaction reference, fluent amount, type aliases]
   questions: ["what enums does finestvx define?", "what type aliases exist in the accounting core?", "how are posting directions represented?", "what lifecycle states exist for transactions?", "what lifecycle states exist for fiscal periods?"]
@@ -147,4 +147,3 @@ type TransactionReference = str
 ### Constraints
 - Purpose: external or internal transaction identifier; referenced by `reversal_of`.
 - Narrowing: validated as non-empty; self-referential `reversal_of` is rejected by `JournalTransaction`.
-

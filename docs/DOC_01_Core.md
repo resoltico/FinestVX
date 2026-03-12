@@ -1,8 +1,8 @@
 ---
 afad: "3.3"
-version: "0.1.0"
+version: "0.2.0"
 domain: CORE
-updated: "2026-03-09"
+updated: "2026-03-12"
 route:
   keywords: [book aggregate, journal transaction, ledger entry, chart of accounts, balance validation, fiscal period wrapper, immutable ledger]
   questions: ["how is a book modeled?", "what invariants does a journal transaction enforce?", "how are ledger entries represented?", "how do i validate a chart of accounts?", "what is the current FinestVX core API?"]

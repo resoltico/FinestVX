@@ -1,6 +1,6 @@
 ---
 afad: "3.3"
-version: "0.1.0"
+version: "0.3.0"
 domain: CHANGELOG
 updated: "2026-03-12"
 route:
@@ -14,6 +14,88 @@ Notable changes to this project are documented in this file. The format is based
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.3.0] - 2026-03-12
+
+### Added
+
+- **`persistence`: APSW async reader and typed telemetry surface**:
+  - Added `AsyncLedgerReader` for explicit APSW `as_async(...)` read-only access to book snapshots,
+    audit rows, and connection telemetry
+  - Added typed APSW observability records: `StoreStatementCacheStats`,
+    `StoreStatusCounter`, `StoreConnectionDebugSnapshot`, `StoreWalCommit`,
+    `StoreTraceEvent`, and `StoreProfileEvent`
+  - Added `StoreWriteReceipt` so every persisted mutation carries APSW `changeset` and `patchset`
+    bytes plus changed-table metadata
+
+- **`localization.LocalizationService`: structured schema and cache-control helpers**:
+  - Added `cache_enabled`, `cache_config`, and `clear_cache()` so callers can inspect and control
+    the live FTLLexEngine format-cache boundary directly
+  - Added `get_message()` and `get_term()` to surface fallback-chain AST nodes for explicit schema
+    inspection and FTL debugging
+  - Added `validate_message_variables()` to expose FTLLexEngine's structured
+    `MessageVariableValidationResult` at the FinestVX service layer
+  - Added `get_cache_audit_log()` so callers can retrieve immutable per-locale FTLLexEngine cache
+    audit trails through the FinestVX service facade
+
+### Changed
+
+- **`persistence.PersistenceConfig`: APSW topology and integrity policy expanded**:
+  - Added explicit reader-pool and telemetry controls:
+    `reader_connection_count`, `reader_checkout_timeout`,
+    `writer_statement_cache_size`, `reader_statement_cache_size`,
+    `reserve_bytes`, `telemetry_buffer_size`, and optional `vfs_name`
+  - Existing databases now hard-fail on `reserve_bytes` mismatch; no backward-compatibility
+    shims or migrations are provided
+
+- **`persistence.SqliteLedgerStore`: single connection replaced with writer plus read-only reader pool**:
+  - Reads now run through pooled APSW read-only connections while writes remain serialized on one
+    writer connection, enabling actual WAL read concurrency instead of multi-threading one shared
+    connection
+  - Applied APSW hardening and telemetry features directly: modern `set_busy_timeout()`,
+    DQS disablement, query-planner optimize hooks, SQLite log forwarding, WAL hook capture,
+    `cache_stats()`, and `status()`
+  - Removed the raw `execute()` escape hatch entirely; callers now use typed store APIs only
+
+- **`runtime.LedgerRuntime`: lifecycle locking separated from database concurrency**:
+  - The runtime `RWLock` now gates API lifecycle and shutdown only; it no longer serializes all
+    database reads behind writer-thread store access
+  - Write mutations and snapshots are queued as typed command dataclasses and still execute on the
+    dedicated writer thread
+  - `create_book()`, `append_transaction()`, and `append_legislative_result()` now return
+    `StoreWriteReceipt`
+
+- **`gateway.FinestVXService`: write methods now surface receipt data**:
+  - `create_book()` now returns the underlying `StoreWriteReceipt`
+  - `post_transaction()` now returns `PostedTransactionResult`, containing the ledger write receipt,
+    the legislative validation result, and the legislative audit write receipt
+
+- **FTLLexEngine v0.150.0 integration is now fully adopted in FinestVX**:
+  - `LocalizationService` boot-time message schema enforcement now uses
+    `FluentLocalization.get_message()` plus `ftllexengine.validate_message_variables(...)` instead
+    of manual set arithmetic over `get_message_variables()`
+  - `LocalizationService.get_cache_audit_log()` now delegates to
+    `FluentLocalization.get_cache_audit_log()`, exposing immutable `WriteLogEntry` trails for
+    initialized locale bundles
+  - `AmountParseResult` now imports the canonical `ParseResult` alias from the FTLLexEngine
+    top-level package, matching the upstream diagnostics move
+  - `FiscalDelta`, `MonthEndPolicy`, and `get_cldr_version` are now wired through FTLLexEngine's
+    top-level exports in the FinestVX core and package root
+
+### Fixed
+
+- **APSW compatibility and observability alignment**:
+  - Replaced the legacy APSW alias `setbusytimeout()` with `set_busy_timeout()`
+  - Moved WAL commit capture to the post-WAL configuration point so write receipts and debug
+    snapshots expose stable `StoreWalCommit` data
+  - Updated the persistence, runtime, gateway, and package-edge tests to cover the new reader-pool,
+    async-reader, reserve-bytes, receipt, and queued-snapshot architecture
+
+- **Localization integration regression coverage expanded**:
+  - Added a Hypothesis property test for structured FTL variable-schema validation, including
+    semantic `event()` emission for declared/expected variable counts and valid/invalid outcomes
+  - Extended localization edge tests to cover cache controls, direct message/term AST access, and
+    per-locale cache audit-log retrieval
 
 ## [0.2.0] - 2026-03-12
 

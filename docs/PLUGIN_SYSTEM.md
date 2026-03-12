@@ -1,8 +1,8 @@
 ---
 afad: "3.3"
-version: "0.1.0"
+version: "0.2.0"
 domain: AUXILIARY
-updated: "2026-03-09"
+updated: "2026-03-12"
 route:
   keywords: [plugin system, legislative pack, registry copy, subinterpreters, localization assets, extension workflow]
   questions: ["how does the finestvx plugin system work today?", "how do i add a jurisdiction pack?", "why does each pack get its own function registry copy?", "how are packs isolated at runtime?", "what does the service do after posting?"]

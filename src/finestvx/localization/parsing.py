@@ -2,13 +2,8 @@
 
 from __future__ import annotations
 
-from ftllexengine.parsing import (
-    ParseResult,
-    parse_currency,
-    parse_date,
-    parse_datetime,
-    parse_decimal,
-)
+from ftllexengine import ParseResult
+from ftllexengine.parsing import parse_currency, parse_date, parse_datetime, parse_decimal
 from ftllexengine.runtime.function_bridge import FluentNumber
 
 from finestvx.core.serialization import fluent_number_from_decimal

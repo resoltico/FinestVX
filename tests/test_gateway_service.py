@@ -20,8 +20,11 @@ class TestFinestVXService:
         )
         book = build_sample_book()
 
-        service.create_book(book, audit_context=AuditContext(actor="tester", reason="bootstrap"))
-        service.post_transaction(
+        create_receipt = service.create_book(
+            book,
+            audit_context=AuditContext(actor="tester", reason="bootstrap"),
+        )
+        post_result = service.post_transaction(
             book.code,
             build_posted_transaction(reference="TX-2026-0020"),
             audit_context=AuditContext(actor="tester", reason="post"),
@@ -34,5 +37,9 @@ class TestFinestVXService:
         assert b'"code":"demo-book"' in artifact.content
         assert text == "Latvijas standarta pakotne 2026"
         assert errors == ()
+        assert "books" in create_receipt.changed_tables
+        assert "transactions" in post_result.ledger_write.changed_tables
+        assert post_result.legislative_result.pack_code == "lv.standard.2026"
+        assert "audit_log" in post_result.legislative_write.changed_tables
 
         service.close()

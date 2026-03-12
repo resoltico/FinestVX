@@ -8,8 +8,7 @@ from importlib.metadata import version as _get_version
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ftllexengine import get_cldr_version
-    from ftllexengine.core.fiscal import FiscalDelta, MonthEndPolicy
+    from ftllexengine import FiscalDelta, MonthEndPolicy, get_cldr_version
 
     from .core import (
         Account,
@@ -28,7 +27,12 @@ if TYPE_CHECKING:
         validate_transaction_balance,
     )
     from .export import ExportArtifact, LedgerExporter
-    from .gateway import FinestVXService, FinestVXServiceConfig, GatewayDebugSnapshot
+    from .gateway import (
+        FinestVXService,
+        FinestVXServiceConfig,
+        GatewayDebugSnapshot,
+        PostedTransactionResult,
+    )
     from .legislation import (
         ILegislativePack,
         LatviaStandard2026Pack,
@@ -52,12 +56,20 @@ if TYPE_CHECKING:
     )
     from .persistence import (
         MANDATED_CACHE_CONFIG,
+        AsyncLedgerReader,
         AuditContext,
         AuditLogRecord,
         DatabaseSnapshot,
         PersistenceConfig,
         SqliteLedgerStore,
+        StoreConnectionDebugSnapshot,
         StoreDebugSnapshot,
+        StoreProfileEvent,
+        StoreStatementCacheStats,
+        StoreStatusCounter,
+        StoreTraceEvent,
+        StoreWalCommit,
+        StoreWriteReceipt,
         create_snapshot,
     )
     from .runtime import LedgerRuntime, RuntimeConfig, RuntimeDebugSnapshot
@@ -85,6 +97,7 @@ __all__ = [
     "Account",
     "AccountCode",
     "AmountParseResult",
+    "AsyncLedgerReader",
     "AuditContext",
     "AuditLogRecord",
     "Book",
@@ -113,11 +126,19 @@ __all__ = [
     "LocalizationService",
     "MonthEndPolicy",
     "PersistenceConfig",
+    "PostedTransactionResult",
     "PostingSide",
     "RuntimeConfig",
     "RuntimeDebugSnapshot",
     "SqliteLedgerStore",
+    "StoreConnectionDebugSnapshot",
     "StoreDebugSnapshot",
+    "StoreProfileEvent",
+    "StoreStatementCacheStats",
+    "StoreStatusCounter",
+    "StoreTraceEvent",
+    "StoreWalCommit",
+    "StoreWriteReceipt",
     "TransactionReference",
     "TransactionState",
     "ValidationFinding",
@@ -144,6 +165,7 @@ _EXPORT_MAP: dict[str, tuple[str, str]] = {
     "Account": ("finestvx.core", "Account"),
     "AccountCode": ("finestvx.core", "AccountCode"),
     "AmountParseResult": ("finestvx.localization", "AmountParseResult"),
+    "AsyncLedgerReader": ("finestvx.persistence", "AsyncLedgerReader"),
     "AuditContext": ("finestvx.persistence", "AuditContext"),
     "AuditLogRecord": ("finestvx.persistence", "AuditLogRecord"),
     "Book": ("finestvx.core", "Book"),
@@ -151,7 +173,7 @@ _EXPORT_MAP: dict[str, tuple[str, str]] = {
     "BookPeriod": ("finestvx.core", "BookPeriod"),
     "DatabaseSnapshot": ("finestvx.persistence", "DatabaseSnapshot"),
     "ExportArtifact": ("finestvx.export", "ExportArtifact"),
-    "FiscalDelta": ("finestvx.core", "FiscalDelta"),
+    "FiscalDelta": ("ftllexengine", "FiscalDelta"),
     "FiscalPeriodState": ("finestvx.core", "FiscalPeriodState"),
     "FinestVXService": ("finestvx.gateway", "FinestVXService"),
     "FinestVXServiceConfig": ("finestvx.gateway", "FinestVXServiceConfig"),
@@ -177,13 +199,21 @@ _EXPORT_MAP: dict[str, tuple[str, str]] = {
     "LocalizationConfig": ("finestvx.localization", "LocalizationConfig"),
     "LocalizationService": ("finestvx.localization", "LocalizationService"),
     "MANDATED_CACHE_CONFIG": ("finestvx.persistence", "MANDATED_CACHE_CONFIG"),
-    "MonthEndPolicy": ("finestvx.core", "MonthEndPolicy"),
+    "MonthEndPolicy": ("ftllexengine", "MonthEndPolicy"),
     "PersistenceConfig": ("finestvx.persistence", "PersistenceConfig"),
+    "PostedTransactionResult": ("finestvx.gateway", "PostedTransactionResult"),
     "PostingSide": ("finestvx.core", "PostingSide"),
     "RuntimeConfig": ("finestvx.runtime", "RuntimeConfig"),
     "RuntimeDebugSnapshot": ("finestvx.runtime", "RuntimeDebugSnapshot"),
     "SqliteLedgerStore": ("finestvx.persistence", "SqliteLedgerStore"),
+    "StoreConnectionDebugSnapshot": ("finestvx.persistence", "StoreConnectionDebugSnapshot"),
     "StoreDebugSnapshot": ("finestvx.persistence", "StoreDebugSnapshot"),
+    "StoreProfileEvent": ("finestvx.persistence", "StoreProfileEvent"),
+    "StoreStatementCacheStats": ("finestvx.persistence", "StoreStatementCacheStats"),
+    "StoreStatusCounter": ("finestvx.persistence", "StoreStatusCounter"),
+    "StoreTraceEvent": ("finestvx.persistence", "StoreTraceEvent"),
+    "StoreWalCommit": ("finestvx.persistence", "StoreWalCommit"),
+    "StoreWriteReceipt": ("finestvx.persistence", "StoreWriteReceipt"),
     "TransactionReference": ("finestvx.core", "TransactionReference"),
     "TransactionState": ("finestvx.core", "TransactionState"),
     "ValidationFinding": ("finestvx.validation", "ValidationFinding"),

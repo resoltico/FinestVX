@@ -1,11 +1,11 @@
 ---
 afad: "3.3"
-version: "0.1.0"
+version: "0.2.0"
 domain: SECONDARY
-updated: "2026-03-11"
+updated: "2026-03-12"
 route:
-  keywords: [localization config, localization service, fluentlocalization, pathresourceloader, fallback events, strict boot, localized parsing, amount parse result, parse decimal, parse date, parse currency, parse amount, cache stats, message variable schemas, ftl schema validation]
-  questions: ["how does finestvx localization work?", "how are FTL resources validated at boot?", "what fallback data is exposed?", "how are localized values parsed back in?", "how do i format a message?", "what is AmountParseResult?", "how do i validate FTL message variables at boot?"]
+  keywords: [localization config, localization service, fluentlocalization, pathresourceloader, fallback events, strict boot, localized parsing, amount parse result, parse decimal, parse date, parse currency, parse amount, cache stats, cache audit log, message variable schemas, ftl schema validation, message ast, term ast, clear cache]
+  questions: ["how does finestvx localization work?", "how are FTL resources validated at boot?", "what fallback data is exposed?", "how are localized values parsed back in?", "how do i format a message?", "what is AmountParseResult?", "how do i validate FTL message variables at boot?", "how do i inspect a localized message or term AST?", "how do i retrieve localization cache audit logs?"]
 ---
 
 # FinestVX Localization Reference
@@ -60,6 +60,12 @@ class LocalizationService:
     @property
     def fallback_events(self) -> tuple[FallbackInfo, ...]: ...
 
+    @property
+    def cache_enabled(self) -> bool: ...
+
+    @property
+    def cache_config(self) -> CacheConfig | None: ...
+
     def format_value(
         self,
         message_id: str,
@@ -76,6 +82,20 @@ class LocalizationService:
 
     def add_function(self, name: str, func: Callable[..., FluentValue]) -> None: ...
 
+    def get_message(self, message_id: str) -> Message | None: ...
+
+    def get_term(self, term_id: str) -> Term | None: ...
+
+    def validate_message_variables(
+        self,
+        message_id: str,
+        expected_variables: frozenset[str] | set[str],
+    ) -> MessageVariableValidationResult: ...
+
+    def clear_cache(self) -> None: ...
+
+    def get_cache_audit_log(self) -> dict[str, tuple[WriteLogEntry, ...]] | None: ...
+
     def get_cache_stats(self) -> LocalizationCacheStats | None: ...
 
     @staticmethod
@@ -84,13 +104,19 @@ class LocalizationService:
 
 ### Constraints
 - Constructor: loads all FTL resources eagerly; raises `SyntaxIntegrityError` on Junk entries when `require_all_clean=True`; raises `IntegrityCheckFailedError` on I/O failures.
-- Constructor: when `config.message_variable_schemas` is non-empty, validates each message's declared variables against the expected set after the load-summary check; raises `IntegrityCheckFailedError` if any message is missing from all locales or if declared and expected variables do not match exactly.
+- Constructor: when `config.message_variable_schemas` is non-empty, validates each message after the load-summary check via `FluentLocalization.get_message()` plus `ftllexengine.validate_message_variables(...)`; missing messages and any missing or extra variables fail boot.
 - `summary`: the `LoadSummary` produced at initialization; immutable post-construction.
 - `fallback_events`: accumulated `FallbackInfo` records for every locale fallback resolution since boot.
+- `cache_enabled`: `True` when FTLLexEngine format caching is active for this service.
+- `cache_config`: the active `CacheConfig`, or `None` when caching is disabled.
 - `on_fallback`: optional callback invoked synchronously on each fallback; also recorded in `fallback_events`.
 - `format_value` / `format_pattern`: delegate to `FluentLocalization`; return `(formatted_string, errors)`.
+- `get_message` / `get_term`: expose the highest-priority fallback-chain AST node for structured inspection.
+- `validate_message_variables`: returns FTLLexEngine's `MessageVariableValidationResult` for an explicit message schema check; raises `IntegrityCheckFailedError` when the message does not exist in any locale.
+- `clear_cache`: clears initialized FTLLexEngine bundle format caches; use this for service-local invalidation.
+- `get_cache_audit_log`: returns immutable per-locale cache audit logs for initialized bundles, or `None` when caching is disabled.
 - `get_cache_stats`: returns `LocalizationCacheStats | None`; `None` when caching is not active.
-- `clear_module_caches`: clears all FTLLexEngine bounded module-level caches.
+- `clear_module_caches`: clears FTLLexEngine module-level caches; this is broader than `clear_cache()` and does not depend on a specific service instance.
 
 ### Example: FTL variable schema validation at boot
 ```python
@@ -107,6 +133,22 @@ service = LocalizationService(
 )
 # Raises IntegrityCheckFailedError at boot if any declared FTL variable set
 # does not match the schema exactly (missing or extra variables both fail).
+```
+
+### Example: Structured Schema Inspection
+```python
+result = service.validate_message_variables(
+    "invoice-total",
+    frozenset({"amount", "currency"}),
+)
+assert result.is_valid
+```
+
+### Example: Cache Audit Log Access
+```python
+audit_log = service.get_cache_audit_log()
+assert audit_log is not None
+assert "lv-LV" in audit_log
 ```
 
 ---

@@ -51,6 +51,20 @@ class TestPersistenceAndRuntimeEdges:
             PersistenceConfig(tmp_path / "db.sqlite3", wal_auto_checkpoint=0)
         with pytest.raises(ValueError, match="transaction_mode must be one of"):
             PersistenceConfig(tmp_path / "db.sqlite3", transaction_mode="WRONG")
+        with pytest.raises(ValueError, match="reader_connection_count must be positive"):
+            PersistenceConfig(tmp_path / "db.sqlite3", reader_connection_count=0)
+        with pytest.raises(ValueError, match="reader_checkout_timeout must be positive"):
+            PersistenceConfig(tmp_path / "db.sqlite3", reader_checkout_timeout=0)
+        with pytest.raises(ValueError, match="writer_statement_cache_size must be non-negative"):
+            PersistenceConfig(tmp_path / "db.sqlite3", writer_statement_cache_size=-1)
+        with pytest.raises(ValueError, match="reader_statement_cache_size must be non-negative"):
+            PersistenceConfig(tmp_path / "db.sqlite3", reader_statement_cache_size=-1)
+        with pytest.raises(ValueError, match="reserve_bytes must be between 0 and 255 inclusive"):
+            PersistenceConfig(tmp_path / "db.sqlite3", reserve_bytes=256)
+        with pytest.raises(ValueError, match="telemetry_buffer_size must be non-negative"):
+            PersistenceConfig(tmp_path / "db.sqlite3", telemetry_buffer_size=-1)
+        with pytest.raises(ValueError, match="vfs_name must not be blank"):
+            PersistenceConfig(tmp_path / "db.sqlite3", vfs_name="   ")
         with pytest.raises(ValueError, match="queue_timeout must be positive"):
             RuntimeConfig(PersistenceConfig(tmp_path / "db.sqlite3"), queue_timeout=0)
         with pytest.raises(ValueError, match="poll_interval must be positive"):
@@ -121,8 +135,13 @@ class TestPersistenceAndRuntimeEdges:
         assert debug_snapshot.transaction_count == 0
         assert debug_snapshot.entry_count == 0
         assert debug_snapshot.audit_row_count >= 4
+        assert debug_snapshot.writer.statement_cache.size == 256
+        assert len(debug_snapshot.readers) == 4
 
         store.close()
+
+        with pytest.raises(ValueError, match="reserve_bytes mismatch"):
+            SqliteLedgerStore(PersistenceConfig(database_path, reserve_bytes=8))
 
     def test_runtime_context_manager_start_idempotence_and_invalid_submissions(
         self,
@@ -132,7 +151,7 @@ class TestPersistenceAndRuntimeEdges:
         config = RuntimeConfig(PersistenceConfig(tmp_path / "runtime.sqlite3"), poll_interval=0.01)
         with LedgerRuntime(config) as runtime:
             runtime.start()
-            runtime.create_book(
+            create_receipt = runtime.create_book(
                 build_sample_book(),
                 audit_context=AuditContext(actor="tester", reason="bootstrap"),
             )
@@ -141,9 +160,10 @@ class TestPersistenceAndRuntimeEdges:
             assert runtime_snapshot.writer_thread_alive is True
             assert runtime_snapshot.store.book_count == 1
             assert runtime_snapshot.store.audit_row_count >= 4
-            with pytest.raises(TypeError, match="command must be a supported write command"):
+            assert "books" in create_receipt.changed_tables
+            with pytest.raises(TypeError, match="command must be a supported runtime command"):
                 runtime._submit(("demo-book", build_posted_transaction(reference="TX-2026-4003")))
-            with pytest.raises(TypeError, match="command must be a supported write command"):
+            with pytest.raises(TypeError, match="command must be a supported runtime command"):
                 runtime._submit(object())
 
         runtime = object.__new__(LedgerRuntimeClass)
@@ -164,8 +184,8 @@ class TestGatewayAndPackageEdges:
         )
         book = build_sample_book()
         audit_context = AuditContext(actor="tester", reason="bootstrap")
-        service.create_book(book, audit_context=audit_context)
-        service.post_transaction(
+        create_receipt = service.create_book(book, audit_context=audit_context)
+        post_result = service.post_transaction(
             book.code,
             build_posted_transaction(reference="TX-2026-5000"),
             audit_context=AuditContext(actor="tester", reason="post"),
@@ -197,6 +217,8 @@ class TestGatewayAndPackageEdges:
         assert debug_snapshot.registered_pack_codes == ("lv.standard.2026",)
         assert debug_snapshot.runtime.store.book_count == 1
         assert debug_snapshot.runtime.store.transaction_count == 1
+        assert "books" in create_receipt.changed_tables
+        assert "audit_log" in post_result.legislative_write.changed_tables
         assert any(row.table_name == "legislative_validation" for row in audit_rows)
 
         service.close()
@@ -214,6 +236,8 @@ class TestGatewayAndPackageEdges:
             build_posted_transaction(reference="TX-2026-5003"),
         )[0] == "lv.standard.2026"
         assert persistence_module.create_snapshot is create_snapshot_wrapper
+        assert finestvx.StoreWriteReceipt is persistence_module.StoreWriteReceipt
+        assert finestvx.AsyncLedgerReader is persistence_module.AsyncLedgerReader
 
         with pytest.raises(TypeError, match="pack_code must be str"):
             _normalize_pack_code(1)

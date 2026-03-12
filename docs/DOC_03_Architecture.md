@@ -1,18 +1,18 @@
 ---
 afad: "3.3"
-version: "0.1.0"
+version: "0.2.0"
 domain: PRIMARY
-updated: "2026-03-09"
+updated: "2026-03-12"
 route:
-  keywords: [architecture layers, single writer, runtime, subinterpreters, localization, export, debug snapshots, python 3.14]
-  questions: ["what architecture is implemented today?", "how does concurrency work?", "where are the python 3.14 features used?", "what layers exist now?", "how is observability exposed?"]
+  keywords: [architecture layers, apsw runtime, reader pool, writer thread, lifecycle lock, subinterpreters, python 3.14, observability]
+  questions: ["what architecture is implemented today?", "how does concurrency work now?", "where are the python 3.14 features used?", "how do reads and writes interact?", "what observability surfaces exist?"]
 ---
 
 # FinestVX Architecture Reference
 
 ## Implemented Layers
 
-FinestVX implements six strictly-isolated layers with a unidirectional dependency graph.
+FinestVX implements strictly-isolated layers with a unidirectional dependency graph.
 
 ### Core Domain
 - immutable accounting objects in `finestvx.core`;
@@ -21,9 +21,9 @@ FinestVX implements six strictly-isolated layers with a unidirectional dependenc
 
 ### Persistence
 - APSW-backed SQLite WAL store;
-- STRICT tables;
-- append-only protection through SQL triggers;
-- SQL audit trail and zstd-backed snapshots.
+- one writer connection plus a read-only reader pool;
+- append-only triggers and SQL audit logging;
+- reserve-bytes enforcement and WAL-consistent snapshots.
 
 ### Validation
 - domain validation reports;
@@ -39,63 +39,62 @@ FinestVX implements six strictly-isolated layers with a unidirectional dependenc
 ### Presentation and Localization
 - strict `FluentLocalization` wrapper;
 - pack-local FTL resources;
-- fallback observability;
 - localized decimal, date, currency, and amount parsing.
 
 ### Export and Gateway
 - deterministic JSON, CSV, XML, and PDF artifacts;
 - headless service facade;
-- post-commit legislative audit append;
-- runtime and gateway debug snapshots.
+- receipt-based storage writes and legislative audit appends.
 
 ## Concurrency Model
 
-FinestVX implements the single-writer, multi-reader concurrency model.
+FinestVX implements single-writer mutation flow with WAL-concurrent reads.
 
 ### Writes
-- `LedgerRuntime` owns a dedicated write thread.
-- All writes are queued through `_WriteCommand` and executed under `RWLock.write()`.
-- SQLite write concurrency remains serialized by design.
+- `LedgerRuntime` owns one dedicated writer thread.
+- All mutations and snapshots are queued through typed command dataclasses.
+- `SqliteLedgerStore` serializes writer-connection access with an internal writer lock.
 
 ### Reads
-- `LedgerRuntime` serves reads under `RWLock.read()`.
-- Book snapshots, audit iteration, and debug snapshots are read-side operations.
-- Explicit timeouts are configured for both read and write acquisition paths.
+- `SqliteLedgerStore` serves reads from `reader_connection_count` APSW read-only connections.
+- Runtime read methods hold only a lifecycle `RWLock.read()` admission lock.
+- Reads can proceed while the writer thread is executing queued mutations.
+
+### Shutdown
+- `LedgerRuntime.close()` acquires `RWLock.write()` to block new API calls during shutdown.
+- Explicit read and write lock timeouts prevent indefinite stalls.
 
 ## Python 3.14 Usage
 
 ### PEP 750
 - `finestvx.persistence.sql` renders validated SQL from template strings.
-- Dynamic trigger SQL in the schema layer uses identifier and literal interpolation rules.
 
 ### PEP 734
 - `LegislativeInterpreterRunner` executes pack validation inside fresh subinterpreters.
-- Pack failures do not share interpreter state with the core runtime.
 
 ### PEP 784
 - database snapshots use `compression.zstd` for WAL-consistent compressed backups.
 
-### Observability
-- `StoreDebugSnapshot` captures store counters.
-- `RuntimeDebugSnapshot` captures queue and lock state.
-- `GatewayDebugSnapshot` exposes runtime state plus registered pack codes.
-- These surfaces are non-invasive and safe for production introspection.
+## APSW Integration Shape
 
-## FTLLexEngine Boundaries
+APSW is used as a first-class architectural boundary, not as a `sqlite3` substitute.
 
-FinestVX intentionally delegates security-sensitive and correctness-sensitive work.
+### Connection Topology
+- one APSW writer connection for all mutations;
+- pooled APSW read-only connections for concurrent snapshots and lookups;
+- optional APSW async reader surface via `AsyncLedgerReader`.
 
-### Upstream Responsibilities in Use
-- `RWLock` for bounded writer-preference concurrency control;
-- `FluentNumber` for float-free value boundaries;
-- `FiscalCalendar` and `FiscalPeriod` for fiscal identity;
-- ISO validation and locale-aware parsing;
-- `FluentLocalization` and `PathResourceLoader` for strict localization;
-- graph cycle detection and FTL validation.
+### Hardening and Telemetry
+- DQS disabled on all connections;
+- SQLite log forwarding enabled through APSW library logging;
+- `cache_stats()`, `status()`, WAL hook, trace, and profile data surface through `StoreDebugSnapshot`.
 
-### FinestVX Responsibilities
-- accounting-domain modeling;
-- SQLite schema and persistence policies;
-- runtime orchestration;
-- legislative-pack bootstrap and audit integration;
-- deterministic export and service orchestration.
+### Changesets
+- every store mutation returns a `StoreWriteReceipt`;
+- receipts include APSW `changeset` and `patchset` bytes plus changed-table metadata.
+
+## Observability Surfaces
+
+- `StoreDebugSnapshot` exposes connection telemetry, counters, reserve bytes, WAL state, and bounded SQL traces.
+- `RuntimeDebugSnapshot` exposes queue state and lifecycle-lock telemetry.
+- `GatewayDebugSnapshot` exposes runtime state plus registered legislative pack codes.

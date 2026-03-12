@@ -1,4 +1,4 @@
-"""Single-writer, multi-reader runtime coordination for FinestVX."""
+"""Single-writer runtime coordination for FinestVX."""
 
 from __future__ import annotations
 
@@ -6,13 +6,11 @@ from concurrent.futures import Future
 from dataclasses import dataclass
 from queue import Empty, Queue
 from threading import Event, Thread
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from ftllexengine.runtime.rwlock import RWLock
 
-from finestvx.persistence import (
-    SqliteLedgerStore,
-)
+from finestvx.persistence import DatabaseSnapshot, SqliteLedgerStore, StoreWriteReceipt
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -22,7 +20,6 @@ if TYPE_CHECKING:
     from finestvx.legislation.protocols import LegislativeValidationResult
     from finestvx.persistence import (
         AuditContext,
-        DatabaseSnapshot,
         PersistenceConfig,
         StoreDebugSnapshot,
     )
@@ -61,7 +58,7 @@ class _CreateBookCommand:
 
     book: Book
     audit_context: AuditContext
-    future: Future[None]
+    future: Future[StoreWriteReceipt]
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,7 +68,7 @@ class _AppendTransactionCommand:
     book_code: str
     transaction: JournalTransaction
     audit_context: AuditContext
-    future: Future[None]
+    future: Future[StoreWriteReceipt]
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,21 +79,38 @@ class _AppendLegislativeResultCommand:
     transaction_reference: str
     result: LegislativeValidationResult
     audit_context: AuditContext
-    future: Future[None]
+    future: Future[StoreWriteReceipt]
 
 
-type _WriteCommand = (
-    _AppendLegislativeResultCommand | _AppendTransactionCommand | _CreateBookCommand
+@dataclass(frozen=True, slots=True)
+class _CreateSnapshotCommand:
+    """Internal queued request for a WAL-consistent snapshot."""
+
+    output_path: Path | str
+    compress: bool
+    future: Future[DatabaseSnapshot]
+
+
+type _RuntimeCommand = (
+    _AppendLegislativeResultCommand
+    | _AppendTransactionCommand
+    | _CreateBookCommand
+    | _CreateSnapshotCommand
 )
 
 
-def _require_write_command(command: object) -> _WriteCommand:
-    """Validate that a queued object is one of the supported write commands."""
+def _require_runtime_command(command: object) -> _RuntimeCommand:
+    """Validate that a queued object is one of the supported runtime commands."""
     match command:
-        case _CreateBookCommand() | _AppendTransactionCommand() | _AppendLegislativeResultCommand():
+        case (
+            _CreateBookCommand()
+            | _AppendTransactionCommand()
+            | _AppendLegislativeResultCommand()
+            | _CreateSnapshotCommand()
+        ):
             return command
         case _:
-            msg = "command must be a supported write command"
+            msg = "command must be a supported runtime command"
             raise TypeError(msg)
 
 
@@ -115,7 +129,7 @@ class RuntimeDebugSnapshot:
 
 
 class LedgerRuntime:
-    """Dedicated write-thread runtime with RWLock-protected read snapshots."""
+    """Dedicated write-thread runtime with lifecycle locking and WAL-concurrent reads."""
 
     __slots__ = (
         "_config",
@@ -132,7 +146,7 @@ class LedgerRuntime:
         self._config = config
         self._store = SqliteLedgerStore(config.persistence)
         self._lock = RWLock()
-        self._queue: Queue[_WriteCommand | None] = Queue()
+        self._queue: Queue[_RuntimeCommand | None] = Queue()
         self._stop_event = Event()
         self._thread = Thread(
             target=self._writer_loop,
@@ -154,11 +168,12 @@ class LedgerRuntime:
         if not self._started:
             self._store.close()
             return
-        self._stop_event.set()
-        self._queue.put(None, timeout=self._config.queue_timeout)
-        self._thread.join(timeout=self._config.queue_timeout)
-        self._store.close()
-        self._started = False
+        with self._lock.write(timeout=self._config.write_lock_timeout):
+            self._stop_event.set()
+            self._queue.put(None, timeout=self._config.queue_timeout)
+            self._thread.join(timeout=self._config.queue_timeout)
+            self._store.close()
+            self._started = False
 
     def __enter__(self) -> Self:
         """Enter context-manager scope."""
@@ -168,47 +183,66 @@ class LedgerRuntime:
         """Close the runtime at the end of a context-manager scope."""
         self.close()
 
-    def _dispatch_command(self, command: _WriteCommand) -> None:
-        """Execute one write command under the exclusive lock and resolve its Future.
+    def _dispatch_command(self, command: _RuntimeCommand) -> None:
+        """Execute one writer command and resolve its Future.
 
-        Catches all exceptions — including unexpected ones — and forwards them to
-        the command's Future. This prevents the write thread from dying silently:
-        every failure surfaces to the caller via Future.result() rather than
-        being swallowed in a background thread.
+        Catches all exceptions and forwards them to the command Future so the
+        background writer thread never dies silently.
         """
         try:
-            with self._lock.write(timeout=self._config.write_lock_timeout):
-                match command:
-                    case _CreateBookCommand(book=book, audit_context=audit_context):
+            match command:
+                case _CreateBookCommand(
+                    book=book,
+                    audit_context=audit_context,
+                    future=future,
+                ):
+                    future.set_result(
                         self._store.create_book(
                             book,
                             audit_context=audit_context,
                         )
-                    case _AppendTransactionCommand(
-                        book_code=book_code,
-                        transaction=transaction,
-                        audit_context=audit_context,
-                    ):
+                    )
+                case _AppendTransactionCommand(
+                    book_code=book_code,
+                    transaction=transaction,
+                    audit_context=audit_context,
+                    future=future,
+                ):
+                    future.set_result(
                         self._store.append_transaction(
                             book_code,
                             transaction,
                             audit_context=audit_context,
                         )
-                    case _AppendLegislativeResultCommand(
-                        book_code=book_code,
-                        transaction_reference=transaction_reference,
-                        result=result,
-                        audit_context=audit_context,
-                    ):
+                    )
+                case _AppendLegislativeResultCommand(
+                    book_code=book_code,
+                    transaction_reference=transaction_reference,
+                    result=result,
+                    audit_context=audit_context,
+                    future=future,
+                ):
+                    future.set_result(
                         self._store.append_legislative_result(
                             book_code,
                             transaction_reference,
                             result,
                             audit_context=audit_context,
                         )
-            command.future.set_result(None)
+                    )
+                case _CreateSnapshotCommand(
+                    output_path=output_path,
+                    compress=compress,
+                    future=future,
+                ):
+                    future.set_result(
+                        self._store.create_snapshot(
+                            output_path,
+                            compress=compress,
+                        )
+                    )
         except Exception as error:
-            # Future-based dispatch: any exception from a write operation must become
+            # Future-based dispatch: any exception from a store operation must become
             # Future.set_exception() so the caller receives it via Future.result(),
             # rather than leaving the write thread dead and the error silently dropped.
             command.future.set_exception(error)
@@ -224,29 +258,31 @@ class LedgerRuntime:
                 continue
             self._dispatch_command(command)
 
-    def _submit(
-        self,
-        command: object,
-    ) -> None:
-        """Submit a write request and wait for completion."""
-        queued_command = _require_write_command(command)
+    def _submit(self, command: object) -> StoreWriteReceipt | DatabaseSnapshot:
+        """Submit a runtime command and wait for completion."""
+        queued_command = _require_runtime_command(command)
         self._queue.put(
             queued_command,
             timeout=self._config.queue_timeout,
         )
-        queued_command.future.result(
+        return queued_command.future.result(
             timeout=self._config.queue_timeout + self._config.poll_interval
         )
 
-    def create_book(self, book: Book, *, audit_context: AuditContext) -> None:
+    def create_book(self, book: Book, *, audit_context: AuditContext) -> StoreWriteReceipt:
         """Persist a new book through the dedicated write thread."""
-        self._submit(
-            _CreateBookCommand(
-                book=book,
-                audit_context=audit_context,
-                future=Future(),
+        future: Future[StoreWriteReceipt] = Future()
+        with self._lock.read(timeout=self._config.read_lock_timeout):
+            return cast(
+                "StoreWriteReceipt",
+                self._submit(
+                    _CreateBookCommand(
+                        book=book,
+                        audit_context=audit_context,
+                        future=future,
+                    )
+                ),
             )
-        )
 
     def append_transaction(
         self,
@@ -254,16 +290,21 @@ class LedgerRuntime:
         transaction: JournalTransaction,
         *,
         audit_context: AuditContext,
-    ) -> None:
+    ) -> StoreWriteReceipt:
         """Append a posted transaction through the dedicated write thread."""
-        self._submit(
-            _AppendTransactionCommand(
-                book_code=book_code,
-                transaction=transaction,
-                audit_context=audit_context,
-                future=Future(),
+        future: Future[StoreWriteReceipt] = Future()
+        with self._lock.read(timeout=self._config.read_lock_timeout):
+            return cast(
+                "StoreWriteReceipt",
+                self._submit(
+                    _AppendTransactionCommand(
+                        book_code=book_code,
+                        transaction=transaction,
+                        audit_context=audit_context,
+                        future=future,
+                    )
+                ),
             )
-        )
 
     def append_legislative_result(
         self,
@@ -272,30 +313,35 @@ class LedgerRuntime:
         result: LegislativeValidationResult,
         *,
         audit_context: AuditContext,
-    ) -> None:
+    ) -> StoreWriteReceipt:
         """Append a post-commit legislative result through the dedicated write thread."""
-        self._submit(
-            _AppendLegislativeResultCommand(
-                book_code=book_code,
-                transaction_reference=transaction_reference,
-                result=result,
-                audit_context=audit_context,
-                future=Future(),
+        future: Future[StoreWriteReceipt] = Future()
+        with self._lock.read(timeout=self._config.read_lock_timeout):
+            return cast(
+                "StoreWriteReceipt",
+                self._submit(
+                    _AppendLegislativeResultCommand(
+                        book_code=book_code,
+                        transaction_reference=transaction_reference,
+                        result=result,
+                        audit_context=audit_context,
+                        future=future,
+                    )
+                ),
             )
-        )
 
     def get_book_snapshot(self, book_code: str) -> Book:
-        """Read a complete immutable book snapshot under a shared lock."""
+        """Read a complete immutable book snapshot from the reader pool."""
         with self._lock.read(timeout=self._config.read_lock_timeout):
             return self._store.load_book(book_code)
 
     def list_book_codes(self) -> tuple[str, ...]:
-        """List all persisted books under a shared lock."""
+        """List all persisted books from the reader pool."""
         with self._lock.read(timeout=self._config.read_lock_timeout):
             return self._store.list_book_codes()
 
     def iter_audit_log(self, *, limit: int | None = None) -> tuple[AuditLogRecord, ...]:
-        """Read audit log rows under a shared lock."""
+        """Read audit log rows from the reader pool."""
         with self._lock.read(timeout=self._config.read_lock_timeout):
             return self._store.iter_audit_log(limit=limit)
 
@@ -305,9 +351,19 @@ class LedgerRuntime:
         *,
         compress: bool = True,
     ) -> DatabaseSnapshot:
-        """Create a WAL-consistent snapshot under an exclusive write lock."""
-        with self._lock.write(timeout=self._config.write_lock_timeout):
-            return self._store.create_snapshot(output_path, compress=compress)
+        """Create a WAL-consistent snapshot through the dedicated write thread."""
+        future: Future[DatabaseSnapshot] = Future()
+        with self._lock.read(timeout=self._config.read_lock_timeout):
+            return cast(
+                "DatabaseSnapshot",
+                self._submit(
+                    _CreateSnapshotCommand(
+                        output_path=output_path,
+                        compress=compress,
+                        future=future,
+                    )
+                ),
+            )
 
     def debug_snapshot(self) -> RuntimeDebugSnapshot:
         """Return a non-invasive runtime snapshot for production introspection."""

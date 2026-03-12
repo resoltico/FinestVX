@@ -1,8 +1,8 @@
 ---
 afad: "3.3"
-version: "0.1.0"
+version: "0.2.0"
 domain: TESTING
-updated: "2026-03-09"
+updated: "2026-03-12"
 route:
   keywords: [pytest, hypothesis, mypy, pylint, ruff, lint.sh, test.sh, coverage, bash 5, quality gates, conftest, hypothesis profiles]
   questions: ["how do i run finestvx tests?", "what quality tools are configured?", "do the shared scripts pass?", "what coverage threshold is enforced?", "what test categories exist now?", "what hypothesis profiles are available?"]

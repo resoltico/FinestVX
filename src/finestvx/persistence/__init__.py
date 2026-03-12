@@ -9,27 +9,55 @@ from .config import MANDATED_CACHE_CONFIG, AuditContext, DatabaseSnapshot, Persi
 
 if TYPE_CHECKING:
     from .backup import create_snapshot
-    from .store import AuditLogRecord, SqliteLedgerStore, StoreDebugSnapshot
+    from .store import (
+        AsyncLedgerReader,
+        AuditLogRecord,
+        SqliteLedgerStore,
+        StoreConnectionDebugSnapshot,
+        StoreDebugSnapshot,
+        StoreProfileEvent,
+        StoreStatementCacheStats,
+        StoreStatusCounter,
+        StoreTraceEvent,
+        StoreWalCommit,
+        StoreWriteReceipt,
+    )
 
 __all__ = [
     "MANDATED_CACHE_CONFIG",
+    "AsyncLedgerReader",
     "AuditContext",
     "AuditLogRecord",
     "DatabaseSnapshot",
     "PersistenceConfig",
     "SqliteLedgerStore",
+    "StoreConnectionDebugSnapshot",
     "StoreDebugSnapshot",
+    "StoreProfileEvent",
+    "StoreStatementCacheStats",
+    "StoreStatusCounter",
+    "StoreTraceEvent",
+    "StoreWalCommit",
+    "StoreWriteReceipt",
     "create_snapshot",
 ]
 
 
 def __getattr__(name: str) -> object:
     """Lazy-load APSW-backed components to keep package import lightweight."""
-    if name == "AuditLogRecord":
-        return getattr(import_module(".store", __name__), name)
-    if name == "SqliteLedgerStore":
-        return getattr(import_module(".store", __name__), name)
-    if name == "StoreDebugSnapshot":
+    if name in {
+        "AsyncLedgerReader",
+        "AuditLogRecord",
+        "SqliteLedgerStore",
+        "StoreConnectionDebugSnapshot",
+        "StoreDebugSnapshot",
+        "StoreProfileEvent",
+        "StoreStatementCacheStats",
+        "StoreStatusCounter",
+        "StoreTraceEvent",
+        "StoreWalCommit",
+        "StoreWriteReceipt",
+    }:
         return getattr(import_module(".store", __name__), name)
     if name == "create_snapshot":
         return getattr(import_module(".backup", __name__), name)

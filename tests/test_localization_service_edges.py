@@ -165,7 +165,10 @@ class TestLocalizationServiceEdges:
         (base_path / "lv-LV").mkdir(parents=True)
         (base_path / "en-US").mkdir(parents=True)
         (base_path / "lv-LV" / "app.ftl").write_text(
-            "message = Primary\n    .hint = Primary hint\n",
+            "-brand = FinestVX\n"
+            "message = Primary\n"
+            "    .hint = Primary hint\n"
+            "schema-message = Sveiks, { $name }!\n",
             encoding="utf-8",
         )
         (base_path / "en-US" / "app.ftl").write_text(
@@ -194,17 +197,37 @@ class TestLocalizationServiceEdges:
         )
 
         service.add_function("ECHO", lambda: "x")
+        message = service.get_message("schema-message")
+        term = service.get_term("brand")
+        schema_result = service.validate_message_variables(
+            "schema-message",
+            frozenset({"name"}),
+        )
         cache_stats = service.get_cache_stats()
+        cache_audit_log = service.get_cache_audit_log()
+        service.clear_cache()
         service.clear_module_caches()
 
         assert service.summary.all_clean is True
+        assert service.cache_enabled is True
+        assert service.cache_config is not None
+        assert service.cache_config.enable_audit is True
         assert hint_value == "Primary hint"
         assert hint_errors == ()
         assert fallback_value == "Fallback"
         assert fallback_errors == ()
+        assert message is not None
+        assert term is not None
+        assert schema_result.is_valid is True
+        assert schema_result.declared_variables == frozenset({"name"})
         assert len(service.fallback_events) == 1
         assert len(callback_events) == 1
         assert cache_stats is not None
+        assert cache_stats["audit_enabled"] is True
+        assert cache_audit_log is not None
+        assert set(cache_audit_log) == {"en-US", "lv-LV"}
+        assert len(cache_audit_log["lv-LV"]) > 0
+        assert len(cache_audit_log["en-US"]) > 0
         assert clear_calls == ["ok"]
 
     def test_pack_localization_exposes_cache_stats(self) -> None:
@@ -212,10 +235,13 @@ class TestLocalizationServiceEdges:
         service = LatviaStandard2026Pack().create_localization()
 
         value, errors = service.format_pattern("latvia-pack-name")
+        cache_audit_log = service.get_cache_audit_log()
 
         assert value == "Latvijas standarta pakotne 2026"
         assert errors == ()
         assert service.get_cache_stats() is not None
+        assert cache_audit_log is not None
+        assert "lv-LV" in cache_audit_log
 
     def test_config_message_variable_schemas_normalizes_set_to_frozenset(
         self, tmp_path: Path

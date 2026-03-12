@@ -1,8 +1,8 @@
 ---
 afad: "3.3"
-version: "0.1.0"
+version: "0.2.0"
 domain: INDEX
-updated: "2026-03-10"
+updated: "2026-03-12"
 route:
   keywords: [finestvx api, bookkeeping core, persistence, runtime, localization, export, gateway, plugin system, validation, fiscal delta, month end policy, cldr version]
   questions: ["what does finestvx export?", "where is persistence documented?", "where is the plugin system documented?", "where are localization and parsing documented?", "where is the service facade documented?", "where is validation documented?", "how do i do fiscal period arithmetic?"]
@@ -65,13 +65,21 @@ from finestvx import (
 ### Persistence and Runtime
 ```python
 from finestvx import (
+    AsyncLedgerReader,
     AuditContext,
     AuditLogRecord,
     DatabaseSnapshot,
     MANDATED_CACHE_CONFIG,
     PersistenceConfig,
     SqliteLedgerStore,
+    StoreConnectionDebugSnapshot,
     StoreDebugSnapshot,
+    StoreProfileEvent,
+    StoreStatementCacheStats,
+    StoreStatusCounter,
+    StoreTraceEvent,
+    StoreWalCommit,
+    StoreWriteReceipt,
     LedgerRuntime,
     RuntimeConfig,
     RuntimeDebugSnapshot,
@@ -101,6 +109,7 @@ from finestvx import (
     FinestVXService,
     FinestVXServiceConfig,
     GatewayDebugSnapshot,
+    PostedTransactionResult,
 )
 ```
 
@@ -125,12 +134,14 @@ from finestvx import get_cldr_version
 | error model, integrity exceptions, APSW errors, `TimeoutError` | [DOC_05_Errors.md](DOC_05_Errors.md) | Errors |
 | pytest, Hypothesis, scripts, Bash 5 requirement | [DOC_06_Testing.md](DOC_06_Testing.md) | Testing |
 | `AuditContext`, `AuditLogRecord`, `PersistenceConfig`, `DatabaseSnapshot` | [DOC_07_Persistence.md](DOC_07_Persistence.md) | Persistence |
-| `MANDATED_CACHE_CONFIG`, `SqliteLedgerStore`, `StoreDebugSnapshot`, `create_snapshot` | [DOC_07_Persistence.md](DOC_07_Persistence.md) | Persistence |
+| `AsyncLedgerReader`, `StoreWriteReceipt`, `StoreWalCommit`, `StoreTraceEvent`, `StoreProfileEvent` | [DOC_07_Persistence.md](DOC_07_Persistence.md) | Persistence |
+| `StoreStatementCacheStats`, `StoreStatusCounter`, `StoreConnectionDebugSnapshot`, `StoreDebugSnapshot`, `SqliteLedgerStore`, `create_snapshot` | [DOC_07_Persistence.md](DOC_07_Persistence.md) | Persistence |
 | `LocalizationConfig`, `LocalizationService` | [DOC_08_Localization.md](DOC_08_Localization.md) | Localization |
+| message AST access, term AST access, FTL schema validation, localization cache audit logs | [DOC_08_Localization.md](DOC_08_Localization.md) | Localization |
 | `AmountParseResult`, `parse_decimal_input`, `parse_date_input`, `parse_datetime_input`, `parse_currency_input`, `parse_amount_input` | [DOC_08_Localization.md](DOC_08_Localization.md) | Localization |
 | `ExportArtifact`, `LedgerExporter` | [DOC_09_Exports_Gateway.md](DOC_09_Exports_Gateway.md) | Export and Gateway |
 | `RuntimeConfig`, `LedgerRuntime`, `RuntimeDebugSnapshot` | [DOC_09_Exports_Gateway.md](DOC_09_Exports_Gateway.md) | Export and Gateway |
-| `FinestVXServiceConfig`, `FinestVXService`, `GatewayDebugSnapshot` | [DOC_09_Exports_Gateway.md](DOC_09_Exports_Gateway.md) | Export and Gateway |
+| `FinestVXServiceConfig`, `FinestVXService`, `GatewayDebugSnapshot`, `PostedTransactionResult` | [DOC_09_Exports_Gateway.md](DOC_09_Exports_Gateway.md) | Export and Gateway |
 | `ValidationSeverity`, `ValidationFinding`, `ValidationReport` | [DOC_10_Validation.md](DOC_10_Validation.md) | Validation |
 | `validate_book`, `validate_transaction`, `validate_ftl_resource`, `validate_legislative_transaction` | [DOC_10_Validation.md](DOC_10_Validation.md) | Validation |
 | `get_cldr_version`, FTLLexEngine dependency map | [FTLLEXENGINE_INTEGRATION.md](FTLLEXENGINE_INTEGRATION.md) | Integration |

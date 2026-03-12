@@ -1,18 +1,18 @@
 # Core domain models
 # External re-exports (ftllexengine)
-from ftllexengine.introspection import get_cldr_version as get_cldr_version
+from ftllexengine import FiscalDelta as FiscalDelta
+from ftllexengine import MonthEndPolicy as MonthEndPolicy
+from ftllexengine import get_cldr_version as get_cldr_version
 
 from .core import Account as Account
 from .core import AccountCode as AccountCode
 from .core import Book as Book
 from .core import BookCode as BookCode
 from .core import BookPeriod as BookPeriod
-from .core import FiscalDelta as FiscalDelta
 from .core import FiscalPeriodState as FiscalPeriodState
 from .core import JournalTransaction as JournalTransaction
 from .core import LedgerEntry as LedgerEntry
 from .core import LegislativePackCode as LegislativePackCode
-from .core import MonthEndPolicy as MonthEndPolicy
 from .core import PostingSide as PostingSide
 from .core import TransactionReference as TransactionReference
 from .core import TransactionState as TransactionState
@@ -27,6 +27,7 @@ from .export import LedgerExporter as LedgerExporter
 from .gateway import FinestVXService as FinestVXService
 from .gateway import FinestVXServiceConfig as FinestVXServiceConfig
 from .gateway import GatewayDebugSnapshot as GatewayDebugSnapshot
+from .gateway import PostedTransactionResult as PostedTransactionResult
 
 # Legislative layer
 from .legislation import ILegislativePack as ILegislativePack
@@ -48,15 +49,23 @@ from .localization import parse_currency_input as parse_currency_input
 from .localization import parse_date_input as parse_date_input
 from .localization import parse_datetime_input as parse_datetime_input
 from .localization import parse_decimal_input as parse_decimal_input
+from .persistence import MANDATED_CACHE_CONFIG as MANDATED_CACHE_CONFIG
 
 # Persistence layer
-from .persistence import MANDATED_CACHE_CONFIG as MANDATED_CACHE_CONFIG
+from .persistence import AsyncLedgerReader as AsyncLedgerReader
 from .persistence import AuditContext as AuditContext
 from .persistence import AuditLogRecord as AuditLogRecord
 from .persistence import DatabaseSnapshot as DatabaseSnapshot
 from .persistence import PersistenceConfig as PersistenceConfig
 from .persistence import SqliteLedgerStore as SqliteLedgerStore
+from .persistence import StoreConnectionDebugSnapshot as StoreConnectionDebugSnapshot
 from .persistence import StoreDebugSnapshot as StoreDebugSnapshot
+from .persistence import StoreProfileEvent as StoreProfileEvent
+from .persistence import StoreStatementCacheStats as StoreStatementCacheStats
+from .persistence import StoreStatusCounter as StoreStatusCounter
+from .persistence import StoreTraceEvent as StoreTraceEvent
+from .persistence import StoreWalCommit as StoreWalCommit
+from .persistence import StoreWriteReceipt as StoreWriteReceipt
 from .persistence import create_snapshot as create_snapshot
 
 # Runtime layer
@@ -82,6 +91,7 @@ __all__: list[str] = [
     "Account",
     "AccountCode",
     "AmountParseResult",
+    "AsyncLedgerReader",
     "AuditContext",
     "AuditLogRecord",
     "Book",
@@ -110,11 +120,19 @@ __all__: list[str] = [
     "LocalizationService",
     "MonthEndPolicy",
     "PersistenceConfig",
+    "PostedTransactionResult",
     "PostingSide",
     "RuntimeConfig",
     "RuntimeDebugSnapshot",
     "SqliteLedgerStore",
+    "StoreConnectionDebugSnapshot",
     "StoreDebugSnapshot",
+    "StoreProfileEvent",
+    "StoreStatementCacheStats",
+    "StoreStatusCounter",
+    "StoreTraceEvent",
+    "StoreWalCommit",
+    "StoreWriteReceipt",
     "TransactionReference",
     "TransactionState",
     "ValidationFinding",

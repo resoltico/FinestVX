@@ -1,8 +1,8 @@
 ---
 afad: "3.3"
-version: "0.1.0"
+version: "0.2.0"
 domain: SECONDARY
-updated: "2026-03-09"
+updated: "2026-03-12"
 route:
   keywords: [legislative pack, pack protocol, pack registry, pack metadata, legislative issue, legislative result, subinterpreters, latvia 2026, function registry isolation]
   questions: ["how does the finestvx plugin system work?", "what is an ILegislativePack?", "how are packs isolated at runtime?", "how is the Latvia pack implemented?", "how do i add a jurisdiction pack?"]

@@ -5,7 +5,18 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from ftllexengine import ParseResult
+from ftllexengine import (
+    FiscalDelta as UpstreamFiscalDelta,
+)
+from ftllexengine import (
+    MonthEndPolicy as UpstreamMonthEndPolicy,
+)
+from ftllexengine import (
+    ParseResult,
+)
+from ftllexengine import (
+    get_cldr_version as upstream_get_cldr_version,
+)
 from ftllexengine.runtime.function_bridge import FluentNumber
 
 import finestvx
@@ -49,6 +60,12 @@ class TestPackageInit:
         version = get_cldr_version()
         assert isinstance(version, str)
         assert version
+
+    def test_upstream_re_exports_remain_identity_equal(self) -> None:
+        """FinestVX root exports point at the FTLLexEngine top-level symbols directly."""
+        assert FiscalDelta is UpstreamFiscalDelta
+        assert MonthEndPolicy is UpstreamMonthEndPolicy
+        assert get_cldr_version is upstream_get_cldr_version
 
     def test_parse_datetime_input_is_accessible(self) -> None:
         """parse_datetime_input is exported and delegates to ftllexengine."""
