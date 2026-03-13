@@ -9,9 +9,8 @@ from decimal import Decimal
 from itertools import pairwise
 from typing import TYPE_CHECKING, Final
 
-from ftllexengine import FluentNumber
-from ftllexengine.analysis.graph import detect_cycles, make_cycle_key
-from ftllexengine.core.fiscal import FiscalCalendar, FiscalPeriod
+from ftllexengine import FiscalCalendar, FiscalPeriod, FluentNumber
+from ftllexengine.analysis import detect_cycles, make_cycle_key
 from ftllexengine.introspection import (
     CurrencyCode,
     get_currency_decimal_digits,

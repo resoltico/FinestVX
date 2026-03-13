@@ -7,8 +7,7 @@ from decimal import Decimal
 from typing import Any, cast
 
 import pytest
-from ftllexengine import FluentNumber, make_fluent_number
-from ftllexengine.core.fiscal import FiscalCalendar, FiscalPeriod
+from ftllexengine import FiscalCalendar, FiscalPeriod, FluentNumber, make_fluent_number
 
 import finestvx.core.models as models_module
 from finestvx.core import Account, Book, BookPeriod, JournalTransaction, LedgerEntry, PostingSide

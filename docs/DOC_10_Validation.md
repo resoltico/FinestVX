@@ -1,8 +1,8 @@
 ---
 afad: "3.3"
-version: "0.2.0"
+version: "0.4.0"
 domain: PRIMARY
-updated: "2026-03-12"
+updated: "2026-03-13"
 route:
   keywords: [validation report, validation finding, validation severity, validate book, validate transaction, ftl resource validation, legislative validation]
   questions: ["how do i validate a transaction?", "what is a ValidationReport?", "how does finestvx report validation errors?", "how do i validate an ftl resource?", "how do i validate against a legislative pack?"]

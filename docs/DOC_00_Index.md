@@ -1,6 +1,6 @@
 ---
 afad: "3.3"
-version: "0.3.0"
+version: "0.4.0"
 domain: INDEX
 updated: "2026-03-13"
 route:
@@ -88,10 +88,8 @@ from finestvx import (
 ### Localization
 ```python
 from finestvx import (
-    AmountParseResult,
     LocalizationConfig,
     create_localization,
-    parse_amount_input,
 )
 ```
 
@@ -125,8 +123,7 @@ from finestvx import (
 | `AsyncLedgerReader`, `StoreWriteReceipt`, `StoreWalCommit`, `StoreTraceEvent`, `StoreProfileEvent` | [DOC_07_Persistence.md](DOC_07_Persistence.md) | Persistence |
 | `StoreStatementCacheStats`, `StoreStatusCounter`, `StoreConnectionDebugSnapshot`, `StoreDebugSnapshot`, `SqliteLedgerStore`, `create_snapshot` | [DOC_07_Persistence.md](DOC_07_Persistence.md) | Persistence |
 | `LocalizationConfig`, `create_localization` | [DOC_08_Localization.md](DOC_08_Localization.md) | Localization |
-| fallback callbacks, message AST access, FTL schema validation, localization cache audit logs | [DOC_08_Localization.md](DOC_08_Localization.md) | Localization |
-| `AmountParseResult`, `parse_amount_input` | [DOC_08_Localization.md](DOC_08_Localization.md) | Localization |
+| fallback callbacks, message AST access, FTL schema validation, localization cache audit logs, reverse parsing boundary | [DOC_08_Localization.md](DOC_08_Localization.md) | Localization |
 | `ExportArtifact`, `LedgerExporter` | [DOC_09_Exports_Gateway.md](DOC_09_Exports_Gateway.md) | Export and Gateway |
 | `RuntimeConfig`, `LedgerRuntime`, `RuntimeDebugSnapshot` | [DOC_09_Exports_Gateway.md](DOC_09_Exports_Gateway.md) | Export and Gateway |
 | `FinestVXServiceConfig`, `FinestVXService`, `GatewayDebugSnapshot`, `PostedTransactionResult` | [DOC_09_Exports_Gateway.md](DOC_09_Exports_Gateway.md) | Export and Gateway |

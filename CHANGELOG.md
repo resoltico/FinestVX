@@ -1,6 +1,6 @@
 ---
 afad: "3.3"
-version: "0.4.0"
+version: "0.5.0"
 domain: CHANGELOG
 updated: "2026-03-13"
 route:
@@ -14,6 +14,30 @@ Notable changes to this project are documented in this file. The format is based
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.5.0] - 2026-03-13
+
+### Changed
+
+- **FTLLexEngine v0.153.0 is now adopted as the direct parsing and concurrency platform boundary**:
+  - removed `AmountParseResult` and `parse_amount_input` from `finestvx.localization` and the
+    package root; callers now use `ftllexengine.parsing.parse_fluent_number()` directly
+  - `LedgerRuntime` now imports `RWLock` from the stable public `ftllexengine.runtime` facade
+    instead of the internal `runtime.rwlock` module path
+  - FinestVX core modules now import FTLLexEngine fiscal and graph primitives from public facades
+    instead of deeper implementation paths, matching the platform-first boundary in both source and
+    tests
+
+### Fixed
+
+- **FTLLexEngine and incidental integration backlogs are fully resolved downstream**:
+  - adopted the upstream `parse_fluent_number()` and public `runtime.RWLock` exports, clearing the
+    FTLLexEngine tracker
+  - resolved the remaining incidental deep-import observations by switching the affected FinestVX
+    modules and test helpers to public FTLLexEngine facades
+  - updated reference docs to describe the current API surface only; the localization reference now
+    points reverse-parsing callers to FTLLexEngine directly instead of documenting a removed
+    FinestVX wrapper
 
 ## [0.4.0] - 2026-03-13
 

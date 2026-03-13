@@ -1,10 +1,10 @@
 ---
 afad: "3.3"
-version: "0.3.0"
+version: "0.4.0"
 domain: AUXILIARY
 updated: "2026-03-13"
 route:
-  keywords: [ftllexengine dependency map, fluentlocalization, require locale code, validate message variables, make fluent number, normalized locale code, cache config, rwlock, graph validation, fluent function, cache audit log]
+  keywords: [ftllexengine dependency map, fluentlocalization, require locale code, validate message variables, make fluent number, parse fluent number, normalized locale code, cache config, rwlock, graph validation, fluent function, cache audit log]
   questions: ["what exactly does finestvx use from ftllexengine?", "why does finestvx depend on ftllexengine?", "which upstream primitives are active?", "what security boundaries come from ftllexengine?", "what functionality did finestvx delete in favor of ftllexengine?"]
 ---
 
@@ -25,7 +25,7 @@ FinestVX uses FTLLexEngine as an upstream platform dependency, not as copied pro
 - `CacheAuditLogEntry`
 
 Why:
-- bounded writer-preference locking;
+- bounded writer-preference locking via the public `ftllexengine.runtime` facade;
 - float-free value boundaries;
 - canonical `FluentNumber` construction without local precision helpers;
 - `fluent_function` is the decorator for locale-aware custom FTL functions (e.g., `ROUND_EUR` in Latvia pack);
@@ -77,7 +77,7 @@ Why:
 - `FallbackInfo`
 - `LoadSummary`
 - `ParseResult[T]`
-- `parse_decimal()`, `parse_date()`, `parse_datetime()`, `parse_currency()`
+- `parse_decimal()`, `parse_fluent_number()`, `parse_date()`, `parse_datetime()`, `parse_currency()`
 
 Why:
 - strict multi-locale formatting;
@@ -89,8 +89,8 @@ Why:
   initialized bundles without leaking raw cache objects;
 - `CacheAuditLogEntry` is the public audit-log entry type returned by those cache APIs;
 - `ParseResult[T]` is the canonical generic type for all parsing function returns;
-- FinestVX keeps only `parse_amount_input`; raw decimal/date/datetime/currency parsing is imported
-  directly from `ftllexengine.parsing`;
+- FinestVX no longer wraps reverse parsing; callers import `parse_fluent_number()` and the raw
+  decimal/date/datetime/currency parsing functions directly from `ftllexengine.parsing`;
 - locale-aware reverse parsing;
 - cache lifecycle coordination;
 - fallback observability.
@@ -130,6 +130,8 @@ Callers import upstream primitives directly from `ftllexengine`.
 - local localization wrapper classes were removed in favor of returning `FluentLocalization`;
 - local one-message and bulk schema wrappers were removed in favor of
   `validate_message_variables()` and `validate_message_schemas()`;
+- local `parse_amount_input` and `AmountParseResult` were removed; callers use
+  `ftllexengine.parsing.parse_fluent_number()` directly;
 - duplicate raw parse aliases were removed; callers use `ftllexengine.parsing` directly.
 
 ## Why FinestVX Uses FTLLexEngine
@@ -148,4 +150,4 @@ and service composition instead of rebuilding those foundational systems.
 ## Reference Tree Rule
 
 FinestVX production code must import FTLLexEngine from PyPI.
-The local `tmp-dir-FTLLexEngine` path is a reference source only.
+The local `.tmp-dir-FTLLexEngine-src` path is a reference source only.

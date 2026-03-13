@@ -1,8 +1,8 @@
 ---
 afad: "3.3"
-version: "0.2.0"
+version: "0.4.0"
 domain: SECONDARY
-updated: "2026-03-12"
+updated: "2026-03-13"
 route:
   keywords: [persistence, apsw, sqlite wal, reader pool, async reader, changeset, patchset, reserve bytes, store debug snapshot, wal hook]
   questions: ["how does finestvx persistence work now?", "what does SqliteLedgerStore return on writes?", "how are APSW readers configured?", "what telemetry does the store expose?", "how do async reads work?", "how are reserve bytes enforced?"]

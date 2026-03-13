@@ -42,12 +42,7 @@ if TYPE_CHECKING:
         create_default_pack_registry,
         validate_transaction_isolated,
     )
-    from .localization import (
-        AmountParseResult,
-        LocalizationConfig,
-        create_localization,
-        parse_amount_input,
-    )
+    from .localization import LocalizationConfig, create_localization
     from .persistence import (
         MANDATED_CACHE_CONFIG,
         AsyncLedgerReader,
@@ -90,7 +85,6 @@ __all__ = [
     "MANDATED_CACHE_CONFIG",
     "Account",
     "AccountCode",
-    "AmountParseResult",
     "AsyncLedgerReader",
     "AuditContext",
     "AuditLogRecord",
@@ -138,7 +132,6 @@ __all__ = [
     "create_default_pack_registry",
     "create_localization",
     "create_snapshot",
-    "parse_amount_input",
     "validate_book",
     "validate_chart_of_accounts",
     "validate_ftl_resource",
@@ -151,7 +144,6 @@ __all__ = [
 _EXPORT_MAP: dict[str, tuple[str, str]] = {
     "Account": ("finestvx.core", "Account"),
     "AccountCode": ("finestvx.core", "AccountCode"),
-    "AmountParseResult": ("finestvx.localization", "AmountParseResult"),
     "AsyncLedgerReader": ("finestvx.persistence", "AsyncLedgerReader"),
     "AuditContext": ("finestvx.persistence", "AuditContext"),
     "AuditLogRecord": ("finestvx.persistence", "AuditLogRecord"),
@@ -209,7 +201,6 @@ _EXPORT_MAP: dict[str, tuple[str, str]] = {
         "create_default_pack_registry",
     ),
     "create_snapshot": ("finestvx.persistence", "create_snapshot"),
-    "parse_amount_input": ("finestvx.localization", "parse_amount_input"),
     "validate_book": ("finestvx.validation", "validate_book"),
     "validate_chart_of_accounts": ("finestvx.core", "validate_chart_of_accounts"),
     "validate_ftl_resource": ("finestvx.validation", "validate_ftl_resource"),

@@ -6,8 +6,7 @@ from collections.abc import Mapping, Sequence
 from datetime import date, datetime
 from decimal import Decimal
 
-from ftllexengine import make_fluent_number
-from ftllexengine.core.fiscal import FiscalCalendar, FiscalPeriod
+from ftllexengine import FiscalCalendar, FiscalPeriod, make_fluent_number
 
 from .enums import FiscalPeriodState, PostingSide, TransactionState
 from .models import Account, Book, BookPeriod, JournalTransaction, LedgerEntry

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ftllexengine.analysis.graph import detect_cycles
+from ftllexengine.analysis import detect_cycles
 
 from .enums import PostingSide
 from .models import (

@@ -8,7 +8,7 @@ from queue import Empty, Queue
 from threading import Event, Thread
 from typing import TYPE_CHECKING, cast
 
-from ftllexengine.runtime.rwlock import RWLock
+from ftllexengine.runtime import RWLock
 
 from finestvx.persistence import DatabaseSnapshot, SqliteLedgerStore, StoreWriteReceipt
 

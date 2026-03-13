@@ -1,11 +1,11 @@
 ---
 afad: "3.3"
-version: "0.3.0"
+version: "0.4.0"
 domain: SECONDARY
 updated: "2026-03-13"
 route:
-  keywords: [localization config, create localization, fluentlocalization, pathresourceloader, fallback callback, strict boot, amount parse result, parse amount, cache stats, cache audit log, message variable schemas, validate message variables, normalized locale codes]
-  questions: ["how does finestvx localization work?", "how are FTL resources validated at boot?", "how do i create a localization runtime?", "how are localized amounts parsed back in?", "how do i validate message schemas?", "how do i inspect a localized message or term AST?", "how do i retrieve localization cache audit logs?"]
+  keywords: [localization config, create localization, fluentlocalization, pathresourceloader, fallback callback, strict boot, parse fluent number, cache stats, cache audit log, message variable schemas, validate message variables, normalized locale codes]
+  questions: ["how does finestvx localization work?", "how are FTL resources validated at boot?", "how do i create a localization runtime?", "where does localized amount parsing live now?", "how do i validate message schemas?", "how do i inspect a localized message or term AST?", "how do i retrieve localization cache audit logs?"]
 ---
 
 # FinestVX Localization Reference
@@ -67,6 +67,7 @@ def create_localization(
 - Returns the upstream `FluentLocalization` object directly; FinestVX does not wrap it.
 - `require_all_clean=True` calls `FluentLocalization.require_clean()` during construction.
 - `message_variable_schemas` uses `FluentLocalization.validate_message_schemas()` during construction.
+- Reverse parsing is not wrapped by FinestVX; callers use `ftllexengine.parsing.parse_fluent_number()` directly.
 - Fallback observability is callback-based; FinestVX does not store a parallel event log.
 - Summary, cache statistics, cache audit logs, AST access, and one-message schema validation all come from `FluentLocalization`.
 
@@ -80,42 +81,3 @@ localization = create_localization(
     )
 )
 ```
-
----
-
-## `AmountParseResult`
-
-Type alias for the return type of `parse_amount_input`.
-
-### Definition
-```python
-type AmountParseResult = ParseResult[FluentNumber]
-```
-
-### Constraints
-- First element: parsed `FluentNumber` or `None`.
-- Second element: `tuple[FrozenFluentError, ...]`.
-- `ParseResult[T]` is the canonical FTLLexEngine generic parse result.
-
----
-
-## `parse_amount_input`
-
-Function that parses localized decimal text into a `FluentNumber`.
-
-### Signature
-```python
-def parse_amount_input(value: str, locale_code: str) -> AmountParseResult:
-```
-
-### Parameters
-| Name | Type | Req | Semantics |
-|:-----|:-----|:----|:----------|
-| `value` | `str` | Y | Localized decimal text |
-| `locale_code` | `str` | Y | Locale for reverse parsing |
-
-### Constraints
-- Delegates numeric parsing to `ftllexengine.parsing.parse_decimal`.
-- Delegates `FluentNumber` construction to `ftllexengine.make_fluent_number`.
-- Return: `(FluentNumber, ())` on success; `(None, errors)` on failure.
-- FinestVX no longer re-exports raw decimal/date/datetime/currency parsers; import those directly from `ftllexengine.parsing`.

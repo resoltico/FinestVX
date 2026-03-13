@@ -1,6 +1,6 @@
 ---
 afad: "3.3"
-version: "0.3.0"
+version: "0.4.0"
 domain: CORE
 updated: "2026-03-13"
 route:
@@ -53,7 +53,7 @@ class BookPeriod:
 ```
 
 ### Constraints
-- `period` must be an `ftllexengine.core.fiscal.FiscalPeriod`.
+- `period` must be an `ftllexengine.FiscalPeriod`.
 - `start_date` and `end_date` must be `date` values.
 - `state` must be a `FiscalPeriodState` enum member.
 - `end_date` must be on or after `start_date`.
@@ -136,7 +136,7 @@ class Book:
 
 ### Constraints
 - `base_currency` must be a valid ISO 4217 code.
-- `fiscal_calendar` must be `ftllexengine.core.fiscal.FiscalCalendar`.
+- `fiscal_calendar` must be `ftllexengine.FiscalCalendar`.
 - `accounts`, `periods`, and `transactions` are normalized to tuples.
 - Account codes must be unique.
 - Account parent references must resolve within the same book.
@@ -165,7 +165,7 @@ def validate_chart_of_accounts(accounts: Sequence[Account]) -> None:
 - Rejects non-`Account` members.
 - Rejects duplicate account codes.
 - Rejects missing parent references.
-- Rejects account cycles using `ftllexengine.analysis.graph.detect_cycles()`.
+- Rejects account cycles using `ftllexengine.analysis.detect_cycles()`.
 - Returns `None` on success and raises `TypeError` or `ValueError` on failure.
 
 ---
