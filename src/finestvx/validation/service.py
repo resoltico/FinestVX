@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ftllexengine.diagnostics.validation import WarningSeverity
+from ftllexengine.diagnostics import WarningSeverity
 from ftllexengine.validation import validate_resource
 
 from finestvx.core.validation import validate_chart_of_accounts, validate_transaction_balance

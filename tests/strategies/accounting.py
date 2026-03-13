@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from ftllexengine.runtime.function_bridge import FluentNumber
+from ftllexengine import FluentNumber
 from hypothesis import event
 from hypothesis import strategies as st
 from hypothesis.strategies import SearchStrategy

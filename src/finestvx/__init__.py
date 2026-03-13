@@ -8,8 +8,6 @@ from importlib.metadata import version as _get_version
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ftllexengine import FiscalDelta, MonthEndPolicy, get_cldr_version
-
     from .core import (
         Account,
         AccountCode,
@@ -47,12 +45,8 @@ if TYPE_CHECKING:
     from .localization import (
         AmountParseResult,
         LocalizationConfig,
-        LocalizationService,
+        create_localization,
         parse_amount_input,
-        parse_currency_input,
-        parse_date_input,
-        parse_datetime_input,
-        parse_decimal_input,
     )
     from .persistence import (
         MANDATED_CACHE_CONFIG,
@@ -107,7 +101,6 @@ __all__ = [
     "ExportArtifact",
     "FinestVXService",
     "FinestVXServiceConfig",
-    "FiscalDelta",
     "FiscalPeriodState",
     "GatewayDebugSnapshot",
     "ILegislativePack",
@@ -123,8 +116,6 @@ __all__ = [
     "LegislativePackRegistry",
     "LegislativeValidationResult",
     "LocalizationConfig",
-    "LocalizationService",
-    "MonthEndPolicy",
     "PersistenceConfig",
     "PostedTransactionResult",
     "PostingSide",
@@ -145,13 +136,9 @@ __all__ = [
     "ValidationReport",
     "ValidationSeverity",
     "create_default_pack_registry",
+    "create_localization",
     "create_snapshot",
-    "get_cldr_version",
     "parse_amount_input",
-    "parse_currency_input",
-    "parse_date_input",
-    "parse_datetime_input",
-    "parse_decimal_input",
     "validate_book",
     "validate_chart_of_accounts",
     "validate_ftl_resource",
@@ -173,7 +160,6 @@ _EXPORT_MAP: dict[str, tuple[str, str]] = {
     "BookPeriod": ("finestvx.core", "BookPeriod"),
     "DatabaseSnapshot": ("finestvx.persistence", "DatabaseSnapshot"),
     "ExportArtifact": ("finestvx.export", "ExportArtifact"),
-    "FiscalDelta": ("ftllexengine", "FiscalDelta"),
     "FiscalPeriodState": ("finestvx.core", "FiscalPeriodState"),
     "FinestVXService": ("finestvx.gateway", "FinestVXService"),
     "FinestVXServiceConfig": ("finestvx.gateway", "FinestVXServiceConfig"),
@@ -197,9 +183,7 @@ _EXPORT_MAP: dict[str, tuple[str, str]] = {
         "LegislativeValidationResult",
     ),
     "LocalizationConfig": ("finestvx.localization", "LocalizationConfig"),
-    "LocalizationService": ("finestvx.localization", "LocalizationService"),
     "MANDATED_CACHE_CONFIG": ("finestvx.persistence", "MANDATED_CACHE_CONFIG"),
-    "MonthEndPolicy": ("ftllexengine", "MonthEndPolicy"),
     "PersistenceConfig": ("finestvx.persistence", "PersistenceConfig"),
     "PostedTransactionResult": ("finestvx.gateway", "PostedTransactionResult"),
     "PostingSide": ("finestvx.core", "PostingSide"),
@@ -219,17 +203,13 @@ _EXPORT_MAP: dict[str, tuple[str, str]] = {
     "ValidationFinding": ("finestvx.validation", "ValidationFinding"),
     "ValidationReport": ("finestvx.validation", "ValidationReport"),
     "ValidationSeverity": ("finestvx.validation", "ValidationSeverity"),
+    "create_localization": ("finestvx.localization", "create_localization"),
     "create_default_pack_registry": (
         "finestvx.legislation",
         "create_default_pack_registry",
     ),
     "create_snapshot": ("finestvx.persistence", "create_snapshot"),
-    "get_cldr_version": ("ftllexengine", "get_cldr_version"),
     "parse_amount_input": ("finestvx.localization", "parse_amount_input"),
-    "parse_currency_input": ("finestvx.localization", "parse_currency_input"),
-    "parse_date_input": ("finestvx.localization", "parse_date_input"),
-    "parse_datetime_input": ("finestvx.localization", "parse_datetime_input"),
-    "parse_decimal_input": ("finestvx.localization", "parse_decimal_input"),
     "validate_book": ("finestvx.validation", "validate_book"),
     "validate_chart_of_accounts": ("finestvx.core", "validate_chart_of_accounts"),
     "validate_ftl_resource": ("finestvx.validation", "validate_ftl_resource"),

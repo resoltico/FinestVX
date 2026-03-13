@@ -5,10 +5,15 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from ftllexengine.core.locale_utils import normalize_locale
 from ftllexengine.integrity import IntegrityCheckFailedError
+from ftllexengine.localization import FallbackInfo, FluentLocalization
 
 from finestvx.legislation.lv import LatviaStandard2026Pack
-from finestvx.localization import LocalizationConfig, LocalizationService
+from finestvx.localization import LocalizationConfig, create_localization
+
+_LV_LOCALE = normalize_locale("lv-LV")
+_EN_LOCALE = normalize_locale("en-US")
 
 
 class TestLocalizationService:
@@ -19,21 +24,22 @@ class TestLocalizationService:
         service = LatviaStandard2026Pack().create_localization()
         value, errors = service.format_value("latvia-pack-name")
 
-        assert service.summary.all_clean is True
+        assert isinstance(service, FluentLocalization)
+        assert service.get_load_summary().all_clean is True
         assert errors == ()
         assert value == "Latvijas standarta pakotne 2026"
 
     def test_message_variable_schema_accepts_correct_variables(self, tmp_path: Path) -> None:
         """Boot succeeds when declared FTL variables match the expected schema exactly."""
         base_path = tmp_path / "locales"
-        (base_path / "lv-LV").mkdir(parents=True)
-        (base_path / "lv-LV" / "app.ftl").write_text(
+        (base_path / _LV_LOCALE).mkdir(parents=True)
+        (base_path / _LV_LOCALE / "app.ftl").write_text(
             "greeting = Sveiks, { $name }!\n"
             "invoice-total = Kopsumma: { $amount } { $currency }\n",
             encoding="utf-8",
         )
 
-        service = LocalizationService(
+        service = create_localization(
             LocalizationConfig(
                 locales=("lv-LV",),
                 resource_ids=("app.ftl",),
@@ -45,19 +51,19 @@ class TestLocalizationService:
             )
         )
 
-        assert service.summary.all_clean is True
+        assert service.get_load_summary().all_clean is True
 
     def test_message_variable_schema_rejects_missing_variable(self, tmp_path: Path) -> None:
         """Boot fails when a required variable is absent from the FTL message."""
         base_path = tmp_path / "locales"
-        (base_path / "lv-LV").mkdir(parents=True)
-        (base_path / "lv-LV" / "app.ftl").write_text(
+        (base_path / _LV_LOCALE).mkdir(parents=True)
+        (base_path / _LV_LOCALE / "app.ftl").write_text(
             "greeting = Sveiks, { $name }!\n",
             encoding="utf-8",
         )
 
-        with pytest.raises(IntegrityCheckFailedError, match="variable mismatch"):
-            LocalizationService(
+        with pytest.raises(IntegrityCheckFailedError, match="Localization message schema validation failed"):
+            create_localization(
                 LocalizationConfig(
                     locales=("lv-LV",),
                     resource_ids=("app.ftl",),
@@ -69,14 +75,14 @@ class TestLocalizationService:
     def test_message_variable_schema_rejects_extra_variable(self, tmp_path: Path) -> None:
         """Boot fails when the FTL message declares a variable not in the expected schema."""
         base_path = tmp_path / "locales"
-        (base_path / "lv-LV").mkdir(parents=True)
-        (base_path / "lv-LV" / "app.ftl").write_text(
+        (base_path / _LV_LOCALE).mkdir(parents=True)
+        (base_path / _LV_LOCALE / "app.ftl").write_text(
             "greeting = Sveiks, { $name } ({ $role })!\n",
             encoding="utf-8",
         )
 
-        with pytest.raises(IntegrityCheckFailedError, match="variable mismatch"):
-            LocalizationService(
+        with pytest.raises(IntegrityCheckFailedError, match="Localization message schema validation failed"):
+            create_localization(
                 LocalizationConfig(
                     locales=("lv-LV",),
                     resource_ids=("app.ftl",),
@@ -88,24 +94,29 @@ class TestLocalizationService:
     def test_fallback_events_are_recorded(self, tmp_path: Path) -> None:
         """Fallback resolution emits structured events from later locales."""
         base_path = tmp_path / "locales"
-        (base_path / "lv-LV").mkdir(parents=True)
-        (base_path / "en-US").mkdir(parents=True)
-        (base_path / "lv-LV" / "app.ftl").write_text("only-lv = tikai latviski\n", encoding="utf-8")
-        (base_path / "en-US" / "app.ftl").write_text(
+        (base_path / _LV_LOCALE).mkdir(parents=True)
+        (base_path / _EN_LOCALE).mkdir(parents=True)
+        (base_path / _LV_LOCALE / "app.ftl").write_text(
+            "only-lv = tikai latviski\n",
+            encoding="utf-8",
+        )
+        (base_path / _EN_LOCALE / "app.ftl").write_text(
             "fallback-message = fallback works\n",
             encoding="utf-8",
         )
 
-        service = LocalizationService(
+        callback_events: list[FallbackInfo] = []
+        service = create_localization(
             LocalizationConfig(
                 locales=("lv-LV", "en-US"),
                 resource_ids=("app.ftl",),
                 base_path=base_path / "{locale}",
-            )
+            ),
+            on_fallback=callback_events.append,
         )
         value, errors = service.format_value("fallback-message")
 
         assert value == "fallback works"
         assert errors == ()
-        assert len(service.fallback_events) == 1
-        assert service.fallback_events[0].resolved_locale == "en-US"
+        assert len(callback_events) == 1
+        assert callback_events[0].resolved_locale == _EN_LOCALE

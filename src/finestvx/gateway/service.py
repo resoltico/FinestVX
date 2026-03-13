@@ -24,9 +24,10 @@ from finestvx.validation import (
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from ftllexengine.localization import FluentLocalization
+
     from finestvx.core.models import Book, JournalTransaction
     from finestvx.legislation import LegislativeValidationResult
-    from finestvx.localization import LocalizationService
 
 __all__ = [
     "FinestVXService",
@@ -179,8 +180,8 @@ class FinestVXService:
         """Create a database snapshot from the underlying runtime store."""
         return self._runtime.create_snapshot(output_path, compress=compress)
 
-    def get_pack_localization(self, pack_code: str) -> LocalizationService:
-        """Create the strict localization service for a registered pack."""
+    def get_pack_localization(self, pack_code: str) -> FluentLocalization:
+        """Create the strict localization runtime for a registered pack."""
         pack = self.registry.resolve(pack_code)
         return pack.create_localization()
 

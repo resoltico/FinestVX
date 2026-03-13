@@ -5,15 +5,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
-from ftllexengine.introspection.iso import is_valid_currency_code, is_valid_territory_code
+from ftllexengine.core.locale_utils import require_locale_code
+from ftllexengine.introspection import is_valid_currency_code, is_valid_territory_code
 
 if TYPE_CHECKING:
-    from ftllexengine.introspection.iso import CurrencyCode, TerritoryCode
-    from ftllexengine.runtime.function_bridge import FunctionRegistry
+    from ftllexengine.introspection import CurrencyCode, TerritoryCode
+    from ftllexengine.localization import FluentLocalization
+    from ftllexengine.runtime import FunctionRegistry
 
     from finestvx.core.models import Book, JournalTransaction
     from finestvx.core.types import LegislativePackCode
-    from finestvx.localization import LocalizationService
 
 __all__ = [
     "ILegislativePack",
@@ -103,7 +104,7 @@ class LegislativePackMetadata:
         object.__setattr__(
             self,
             "default_locale",
-            _require_non_empty_text(self.default_locale, "default_locale"),
+            require_locale_code(self.default_locale, "default_locale"),
         )
         object.__setattr__(self, "currencies", _coerce_tuple(self.currencies, "currencies"))
         if len(self.currencies) == 0:
@@ -189,5 +190,5 @@ class ILegislativePack(Protocol):
     ) -> LegislativeValidationResult:
         """Validate a posted transaction within the pack's legislative rules."""
 
-    def create_localization(self) -> LocalizationService:
-        """Create the pack-local strict localization service."""
+    def create_localization(self) -> FluentLocalization:
+        """Create the pack-local strict localization runtime."""

@@ -1,10 +1,10 @@
 ---
 afad: "3.3"
-version: "0.2.0"
+version: "0.3.0"
 domain: CORE
-updated: "2026-03-12"
+updated: "2026-03-13"
 route:
-  keywords: [book aggregate, journal transaction, ledger entry, chart of accounts, balance validation, fiscal period wrapper, immutable ledger]
+  keywords: [book aggregate, journal transaction, ledger entry, chart of accounts, balance validation, immutable ledger, currency precision]
   questions: ["how is a book modeled?", "what invariants does a journal transaction enforce?", "how are ledger entries represented?", "how do i validate a chart of accounts?", "what is the current FinestVX core API?"]
 ---
 
@@ -32,7 +32,7 @@ class Account:
 ### Constraints
 - `code` and `name` are required non-empty strings.
 - `normal_side` must be `PostingSide.DEBIT` or `PostingSide.CREDIT`.
-- `currency` must be a valid ISO 4217 code via `ftllexengine.introspection.iso.is_valid_currency_code()`.
+- `currency` must be a valid ISO 4217 code via `ftllexengine.introspection.is_valid_currency_code()`.
 - `parent_code`, when present, must be non-empty and cannot equal `code`.
 - Mutability is prohibited; modifications require constructing a new object.
 
@@ -78,10 +78,10 @@ class LedgerEntry:
 ```
 
 ### Constraints
-- `amount` must be `ftllexengine.runtime.function_bridge.FluentNumber`.
+- `amount` must be `ftllexengine.FluentNumber`.
 - Underlying numeric values must be finite and non-negative; polarity lives in `side`, not in the amount sign.
 - `currency` must be a valid ISO 4217 code.
-- `amount` decimal precision is validated against ISO 4217 via `ftllexengine.introspection.iso.get_currency()`: amounts with more decimal places than the currency supports (e.g., JPY=0, EUR=2, KWD=3) are rejected with `ValueError`.
+- `amount` decimal precision is validated against ISO 4217 via `ftllexengine.introspection.get_currency_decimal_digits()`: amounts with more decimal places than the currency supports (e.g., JPY=0, EUR=2, KWD=3) are rejected with `ValueError`.
 - `tax_rate`, when present, must be a finite `Decimal` in the inclusive range `0..1`.
 - `decimal_value` exposes the balancing value as `Decimal`.
 
@@ -149,59 +149,6 @@ class Book:
 - `period_set()`: returns `frozenset[FiscalPeriod]` of all known periods.
 - `append_account(account)`: returns a new `Book` with the account appended; does not mutate.
 - `append_transaction(transaction)`: returns a new `Book` with the transaction appended; does not mutate.
-
----
-
-## `FiscalDelta`
-
-Immutable fiscal period delta from `ftllexengine.core.fiscal`; re-exported from `finestvx.core` for period arithmetic.
-
-### Signature
-```python
-@dataclass(frozen=True, slots=True)
-class FiscalDelta:
-    years: int = 0
-    quarters: int = 0
-    months: int = 0
-    days: int = 0
-    month_end_policy: MonthEndPolicy = MonthEndPolicy.PRESERVE
-
-    def total_months(self) -> int: ...
-    def add_to(self, d: date) -> date: ...
-    def subtract_from(self, d: date) -> date: ...
-```
-
-### Constraints
-- All numeric fields must be `int`; `bool` is rejected.
-- `month_end_policy` must be a `MonthEndPolicy` member.
-- Arithmetic operators `+`, `-`, unary `-`, `*` are defined; mixing `month_end_policy` values in `+`/`-` raises `ValueError`.
-- `add_to` / `subtract_from`: compute target date applying month-end policy.
-- Use case: computing `BookPeriod.start_date` and `BookPeriod.end_date` from `FiscalCalendar` methods.
-
----
-
-## `MonthEndPolicy`
-
-Enumeration controlling month-end date behaviour in `FiscalDelta` arithmetic; re-exported from `finestvx.core`.
-
-### Signature
-```python
-class MonthEndPolicy(StrEnum):
-    PRESERVE = "preserve"
-    CLAMP = "clamp"
-    STRICT = "strict"
-```
-
-### Members
-| Member | Value | Semantics |
-|:-------|:------|:----------|
-| `PRESERVE` | `"preserve"` | Default. Clamp day to last-of-month if arithmetic overflows. |
-| `CLAMP` | `"clamp"` | If original date was month-end, result is always month-end. |
-| `STRICT` | `"strict"` | Raise `ValueError` on any day overflow. |
-
-### Constraints
-- Purpose: date arithmetic policy for `FiscalDelta`; financial period calculations must be explicit about month-end handling.
-- `STRICT` is appropriate for validation mode where inexact dates are errors.
 
 ---
 

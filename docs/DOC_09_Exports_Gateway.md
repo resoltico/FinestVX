@@ -1,8 +1,8 @@
 ---
 afad: "3.3"
-version: "0.2.0"
+version: "0.3.0"
 domain: SECONDARY
-updated: "2026-03-12"
+updated: "2026-03-13"
 route:
   keywords: [export artifact, ledger exporter, runtime config, ledger runtime, posted transaction result, service facade, gateway debug snapshot, runtime debug snapshot]
   questions: ["how does LedgerRuntime work now?", "what does FinestVXService return on writes?", "what runtime debug data is available?", "how are artifacts exported?", "what is PostedTransactionResult?"]
@@ -207,7 +207,7 @@ class FinestVXService:
     def validate_transaction_isolated(self, book_code: str, transaction: JournalTransaction) -> ValidationReport: ...
     def export_book(self, book_code: str, format_name: Literal["json", "csv", "xml", "pdf"]) -> ExportArtifact: ...
     def create_snapshot(self, output_path: Path | str, *, compress: bool = True) -> DatabaseSnapshot: ...
-    def get_pack_localization(self, pack_code: str) -> LocalizationService: ...
+    def get_pack_localization(self, pack_code: str) -> FluentLocalization: ...
     def debug_snapshot(self) -> GatewayDebugSnapshot: ...
 ```
 
@@ -217,4 +217,5 @@ class FinestVXService:
 - `validate_transaction()` combines core validation with in-process legislative validation.
 - `validate_transaction_isolated()` combines core validation with subinterpreter legislative validation.
 - `export_book()` delegates to `LedgerExporter`.
+- `get_pack_localization()` returns the pack's upstream `FluentLocalization` runtime directly.
 - `close()` must be called to release runtime resources.

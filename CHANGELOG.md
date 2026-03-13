@@ -1,8 +1,8 @@
 ---
 afad: "3.3"
-version: "0.3.0"
+version: "0.4.0"
 domain: CHANGELOG
-updated: "2026-03-12"
+updated: "2026-03-13"
 route:
   keywords: [changelog, release notes, version history, breaking changes, migration, fixed, what's new]
   questions: ["what changed in version X?", "what are the breaking changes?", "what was fixed in the latest release?", "what is the release history?"]
@@ -14,6 +14,50 @@ Notable changes to this project are documented in this file. The format is based
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.4.0] - 2026-03-13
+
+### Changed
+
+- **FTLLexEngine v0.152.0 is now the direct localization platform boundary**:
+  - `LocalizationService` was removed entirely; FinestVX now returns upstream
+    `FluentLocalization` instances directly and keeps only `LocalizationConfig` plus
+    `create_localization(...)` as the boot-policy seam
+  - `create_localization(...)` now delegates one-message and bulk message-contract enforcement to
+    `FluentLocalization.validate_message_variables()` and
+    `FluentLocalization.validate_message_schemas()` without local wrapper logic
+  - locale-boundary validation now uses `ftllexengine.core.locale_utils.require_locale_code()`
+    directly; FinestVX no longer carries a duplicate locale canonicalization helper
+  - FTLLexEngine imports now use the public facades exposed in v0.152.0, including
+    `ftllexengine.FluentNumber`, `ftllexengine.runtime.fluent_function`,
+    `ftllexengine.localization.LocalizationCacheStats`, and `CacheAuditLogEntry`
+  - Latvia pack locale assets remain under canonical directory names (`lv_lv`, `en_us`) so pack
+    metadata, loader substitution, cache keys, and fallback telemetry all use one normalized locale
+    model end to end
+
+### Removed
+
+- **Duplicate raw parsing exports deleted from FinestVX**:
+  - `parse_decimal_input`, `parse_date_input`, `parse_datetime_input`, and `parse_currency_input`
+    were removed from `finestvx.localization` and the package root
+  - callers now import raw reverse-parsing functions directly from `ftllexengine.parsing`
+  - `parse_amount_input` remains as the only FinestVX parsing adapter because it returns the
+    bookkeeping engine's `FluentNumber` amount type
+
+- **Pure FTLLexEngine proxy exports deleted from FinestVX**:
+  - `FiscalDelta`, `MonthEndPolicy`, and `get_cldr_version` are no longer exported from
+    `finestvx` or `finestvx.core`
+  - callers now import those upstream primitives directly from `ftllexengine`
+  - FinestVX no longer proxies FTLLexEngine symbols through its own public API surface
+
+### Fixed
+
+- **FTLLexEngine integration backlog resolved end to end**:
+  - upstream enhancement items for locale-boundary validation, single-message localization schema
+    validation, public runtime extension exports, and public localization telemetry exports are now
+    adopted downstream and removed from the FTLLexEngine tracker
+  - the localization-wrapper simplification item and the stale `get_currency()` documentation drift
+    were both resolved in FinestVX source and docs
 
 ## [0.3.0] - 2026-03-12
 

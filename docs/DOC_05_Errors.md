@@ -1,8 +1,8 @@
 ---
 afad: "3.3"
-version: "0.2.0"
+version: "0.3.0"
 domain: ERRORS
-updated: "2026-03-12"
+updated: "2026-03-13"
 route:
   keywords: [error model, integrity exceptions, validation reports, apsw errors, localization boot failure, audit enforcement]
   questions: ["what errors does finestvx raise now?", "how do validation reports differ from exceptions?", "how do localization failures surface?", "what happens on append-only violations?", "which FTLLexEngine exceptions are active?"]
@@ -22,8 +22,8 @@ FinestVX uses FTLLexEngine integrity exceptions directly at selected boundaries.
 
 Active interactions:
 - `ValidationReport.require_valid()` raises `IntegrityCheckFailedError`.
-- `LocalizationService` raises `SyntaxIntegrityError` for Junk resources.
-- `LocalizationService` raises `IntegrityCheckFailedError` for load and fallback-chain failures.
+- `create_localization(...)` raises `SyntaxIntegrityError` for Junk resources.
+- `FluentLocalization.require_clean()` and schema-validation helpers raise `IntegrityCheckFailedError` for localization load and contract failures.
 
 ### SQLite and APSW Errors
 - append-only `UPDATE` or `DELETE` attempts raise `apsw.ConstraintError`.

@@ -3,20 +3,12 @@
 from .parsing import (
     AmountParseResult,
     parse_amount_input,
-    parse_currency_input,
-    parse_date_input,
-    parse_datetime_input,
-    parse_decimal_input,
 )
-from .service import LocalizationConfig, LocalizationService
+from .service import LocalizationConfig, create_localization
 
 __all__ = [
     "AmountParseResult",
     "LocalizationConfig",
-    "LocalizationService",
+    "create_localization",
     "parse_amount_input",
-    "parse_currency_input",
-    "parse_date_input",
-    "parse_datetime_input",
-    "parse_decimal_input",
 ]

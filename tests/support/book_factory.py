@@ -5,11 +5,11 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 from decimal import Decimal
 
+from ftllexengine import make_fluent_number
 from ftllexengine.core.fiscal import FiscalCalendar, FiscalPeriod
 
 from finestvx.core.enums import FiscalPeriodState, PostingSide
 from finestvx.core.models import Account, Book, BookPeriod, JournalTransaction, LedgerEntry
-from finestvx.core.serialization import fluent_number_from_decimal
 
 POSTED_AT = datetime(2026, 1, 15, 9, 30, tzinfo=UTC)
 
@@ -35,14 +35,14 @@ def build_posted_transaction(
             LedgerEntry(
                 account_code="1000",
                 side=PostingSide.DEBIT,
-                amount=fluent_number_from_decimal(amount),
+                amount=make_fluent_number(amount),
                 currency="EUR",
                 tax_rate=tax_rate,
             ),
             LedgerEntry(
                 account_code="2000",
                 side=PostingSide.CREDIT,
-                amount=fluent_number_from_decimal(amount),
+                amount=make_fluent_number(amount),
                 currency="EUR",
                 tax_rate=tax_rate,
             ),

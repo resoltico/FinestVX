@@ -9,14 +9,14 @@ from decimal import Decimal
 from itertools import pairwise
 from typing import TYPE_CHECKING, Final
 
+from ftllexengine import FluentNumber
 from ftllexengine.analysis.graph import detect_cycles, make_cycle_key
 from ftllexengine.core.fiscal import FiscalCalendar, FiscalPeriod
-from ftllexengine.introspection.iso import (
+from ftllexengine.introspection import (
     CurrencyCode,
     get_currency_decimal_digits,
     is_valid_currency_code,
 )
-from ftllexengine.runtime.function_bridge import FluentNumber
 
 from .enums import FiscalPeriodState, PostingSide, TransactionState
 

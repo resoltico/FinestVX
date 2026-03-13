@@ -6,12 +6,15 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
+from ftllexengine import validate_message_variables
+from ftllexengine.core.locale_utils import normalize_locale
 from hypothesis import event, given
 from hypothesis import strategies as st
 
-from finestvx.localization import LocalizationConfig, LocalizationService
+from finestvx.localization import LocalizationConfig, create_localization
 
 _VARIABLE_NAMES = ("amount", "currency", "name", "ref", "role", "title", "total")
+_LV_LOCALE = normalize_locale("lv-LV")
 
 
 def _render_message_source(variables: frozenset[str]) -> str:
@@ -43,13 +46,13 @@ class TestLocalizationServiceProperties:
 
         with TemporaryDirectory() as temp_dir:
             base_path = Path(temp_dir) / "locales"
-            (base_path / "lv-LV").mkdir(parents=True)
-            (base_path / "lv-LV" / "app.ftl").write_text(
+            (base_path / _LV_LOCALE).mkdir(parents=True)
+            (base_path / _LV_LOCALE / "app.ftl").write_text(
                 _render_message_source(declared),
                 encoding="utf-8",
             )
 
-            service = LocalizationService(
+            service = create_localization(
                 LocalizationConfig(
                     locales=("lv-LV",),
                     resource_ids=("app.ftl",),
@@ -57,7 +60,10 @@ class TestLocalizationServiceProperties:
                 )
             )
 
-            result = service.validate_message_variables("message", expected)
+            message = service.get_message("message")
+
+            assert message is not None
+            result = validate_message_variables(message, expected)
 
             assert result.message_id == "message"
             assert result.declared_variables == declared

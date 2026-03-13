@@ -211,7 +211,7 @@ class TestGatewayAndPackageEdges:
         assert service.export_book(book.code, "xml").media_type == "application/xml"
         assert service.export_book(book.code, "pdf").media_type == "application/pdf"
         assert service.create_snapshot(tmp_path / "service-snapshot.zst").compressed is True
-        assert service.get_pack_localization(book.legislative_pack).summary.all_clean is True
+        assert service.get_pack_localization(book.legislative_pack).get_load_summary().all_clean is True
         debug_snapshot = service.debug_snapshot()
         audit_rows = service._runtime.iter_audit_log()
         assert debug_snapshot.registered_pack_codes == ("lv.standard.2026",)

@@ -7,13 +7,12 @@ from decimal import Decimal
 from typing import Any, cast
 
 import pytest
+from ftllexengine import FluentNumber, make_fluent_number
 from ftllexengine.core.fiscal import FiscalCalendar, FiscalPeriod
-from ftllexengine.runtime.function_bridge import FluentNumber
 
 import finestvx.core.models as models_module
 from finestvx.core import Account, Book, BookPeriod, JournalTransaction, LedgerEntry, PostingSide
 from finestvx.core.enums import TransactionState
-from finestvx.core.serialization import fluent_number_from_decimal
 
 _POSTED_AT = datetime(2026, 1, 15, 9, 30, tzinfo=UTC)
 
@@ -128,7 +127,7 @@ class TestCoreModelHelpers:
         one_entry = LedgerEntry(
             account_code="1000",
             side=PostingSide.DEBIT,
-            amount=fluent_number_from_decimal(Decimal("1.00")),
+            amount=make_fluent_number(Decimal("1.00")),
             currency="EUR",
         )
         with pytest.raises(ValueError, match="at least two entries"):
@@ -148,7 +147,7 @@ class TestCoreModelHelpers:
                 LedgerEntry(
                     account_code="2000",
                     side=PostingSide.CREDIT,
-                    amount=fluent_number_from_decimal(Decimal("1.00")),
+                    amount=make_fluent_number(Decimal("1.00")),
                     currency="EUR",
                 ),
             ),
@@ -168,7 +167,7 @@ class TestCoreModelHelpers:
                 LedgerEntry(
                     account_code="2000",
                     side=PostingSide.CREDIT,
-                    amount=fluent_number_from_decimal(Decimal("1.00")),
+                    amount=make_fluent_number(Decimal("1.00")),
                     currency="EUR",
                 ),
             ),
@@ -207,7 +206,7 @@ class TestLedgerEntryCurrencyPrecision:
             LedgerEntry(
                 account_code="1000",
                 side=PostingSide.DEBIT,
-                amount=fluent_number_from_decimal(Decimal("10.001")),
+                amount=make_fluent_number(Decimal("10.001")),
                 currency="EUR",
             )
 
@@ -216,7 +215,7 @@ class TestLedgerEntryCurrencyPrecision:
         entry = LedgerEntry(
             account_code="1000",
             side=PostingSide.DEBIT,
-            amount=fluent_number_from_decimal(Decimal("10.00")),
+            amount=make_fluent_number(Decimal("10.00")),
             currency="EUR",
         )
         assert entry.decimal_value == Decimal("10.00")
@@ -227,7 +226,7 @@ class TestLedgerEntryCurrencyPrecision:
             LedgerEntry(
                 account_code="1000",
                 side=PostingSide.DEBIT,
-                amount=fluent_number_from_decimal(Decimal("100.5")),
+                amount=make_fluent_number(Decimal("100.5")),
                 currency="JPY",
             )
 
@@ -236,7 +235,7 @@ class TestLedgerEntryCurrencyPrecision:
         entry = LedgerEntry(
             account_code="1000",
             side=PostingSide.DEBIT,
-            amount=fluent_number_from_decimal(Decimal(1000)),
+            amount=make_fluent_number(Decimal(1000)),
             currency="JPY",
         )
         assert entry.decimal_value == Decimal(1000)
@@ -246,7 +245,7 @@ class TestLedgerEntryCurrencyPrecision:
         entry = LedgerEntry(
             account_code="1000",
             side=PostingSide.DEBIT,
-            amount=fluent_number_from_decimal(Decimal("1.234")),
+            amount=make_fluent_number(Decimal("1.234")),
             currency="KWD",
         )
         assert entry.decimal_value == Decimal("1.234")
@@ -303,7 +302,7 @@ class TestCoreModelConstructors:
                 LedgerEntry(
                     account_code="1000",
                     side=PostingSide.DEBIT,
-                    amount=fluent_number_from_decimal(Decimal("10.00")),
+                    amount=make_fluent_number(Decimal("10.00")),
                     currency="EUR",
                 ),
             ),

@@ -6,8 +6,8 @@ from collections.abc import Mapping, Sequence
 from datetime import date, datetime
 from decimal import Decimal
 
+from ftllexengine import make_fluent_number
 from ftllexengine.core.fiscal import FiscalCalendar, FiscalPeriod
-from ftllexengine.runtime.function_bridge import FluentNumber
 
 from .enums import FiscalPeriodState, PostingSide, TransactionState
 from .models import Account, Book, BookPeriod, JournalTransaction, LedgerEntry
@@ -15,7 +15,6 @@ from .models import Account, Book, BookPeriod, JournalTransaction, LedgerEntry
 __all__ = [
     "book_from_mapping",
     "book_to_mapping",
-    "fluent_number_from_decimal",
     "transaction_from_mapping",
     "transaction_to_mapping",
 ]
@@ -88,25 +87,6 @@ def _require_decimal(value: object, field_name: str) -> Decimal:
     return Decimal(value)
 
 
-def _decimal_precision(value: Decimal) -> int:
-    """Return visible decimal precision for a finite decimal value."""
-    exponent = value.as_tuple().exponent
-    if not isinstance(exponent, int):
-        msg = "decimal exponent must be int for finite decimal values"
-        raise TypeError(msg)
-    return max(-exponent, 0)
-
-
-def fluent_number_from_decimal(value: Decimal, *, formatted: str | None = None) -> FluentNumber:
-    """Build a ``FluentNumber`` from a decimal amount."""
-    rendered = formatted if formatted is not None else format(value, "f")
-    return FluentNumber(
-        value=value,
-        formatted=rendered,
-        precision=_decimal_precision(value),
-    )
-
-
 def _period_to_mapping(period: FiscalPeriod) -> dict[str, int]:
     """Serialize a fiscal period."""
     return {
@@ -146,7 +126,7 @@ def _entry_from_mapping(payload: object) -> LedgerEntry:
     return LedgerEntry(
         account_code=_require_text(data["account_code"], "entry.account_code"),
         side=PostingSide(_require_text(data["side"], "entry.side")),
-        amount=fluent_number_from_decimal(amount),
+        amount=make_fluent_number(amount),
         currency=_require_text(data["currency"], "entry.currency"),
         description=_optional_text(data.get("description"), "entry.description"),
         tax_rate=None if tax_rate is None else _require_decimal(tax_rate, "entry.tax_rate"),

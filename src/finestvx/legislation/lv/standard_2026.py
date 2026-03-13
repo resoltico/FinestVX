@@ -8,17 +8,24 @@ from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from ftllexengine.runtime.function_bridge import FluentNumber, FunctionRegistry, fluent_function
-from ftllexengine.runtime.functions import get_shared_registry
+from ftllexengine import make_fluent_number
+from ftllexengine.runtime import (
+    FluentNumber,
+    FunctionRegistry,
+    fluent_function,
+    get_shared_registry,
+)
 
 from finestvx.legislation.protocols import (
     LegislativeIssue,
     LegislativePackMetadata,
     LegislativeValidationResult,
 )
-from finestvx.localization import LocalizationConfig, LocalizationService
+from finestvx.localization import LocalizationConfig, create_localization
 
 if TYPE_CHECKING:
+    from ftllexengine.localization import FluentLocalization
+
     from finestvx.core.models import Book, JournalTransaction
 
 __all__ = ["LatviaStandard2026Pack"]
@@ -43,7 +50,7 @@ def round_eur(value: FluentNumber) -> FluentNumber:
             quantized = decimal_val.quantize(_EUR_QUANTIZE, rounding=_ROUND_HALF_UP)
         case _:
             return value
-    return FluentNumber(value=quantized, formatted=format(quantized, "f"), precision=2)
+    return make_fluent_number(quantized)
 
 
 def _build_metadata() -> LegislativePackMetadata:
@@ -71,15 +78,15 @@ class LatviaStandard2026Pack:
     metadata: LegislativePackMetadata = field(default_factory=_build_metadata)
     function_registry: FunctionRegistry = field(default_factory=_build_registry)
 
-    def create_localization(self) -> LocalizationService:
-        """Create the strict pack-local localization service."""
+    def create_localization(self) -> FluentLocalization:
+        """Create the strict pack-local localization runtime."""
         base_path = Path(__file__).with_name("locales") / "{locale}"
         config = LocalizationConfig(
-            locales=("lv-LV", "en-US"),
+            locales=(self.metadata.default_locale, "en_us"),
             resource_ids=("legislation.ftl",),
             base_path=base_path,
         )
-        return LocalizationService(config)
+        return create_localization(config)
 
     def validate_transaction(
         self,

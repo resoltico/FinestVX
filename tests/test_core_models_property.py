@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
-from ftllexengine.runtime.function_bridge import FluentNumber
+from ftllexengine import FluentNumber
 from hypothesis import event, given
 
 from finestvx.core import JournalTransaction, LedgerEntry, PostingSide

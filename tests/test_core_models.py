@@ -6,8 +6,8 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
+from ftllexengine import FluentNumber
 from ftllexengine.core.fiscal import FiscalCalendar, FiscalPeriod
-from ftllexengine.runtime.function_bridge import FluentNumber
 
 from finestvx.core import (
     Account,

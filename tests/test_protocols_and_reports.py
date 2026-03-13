@@ -69,6 +69,7 @@ class TestLegislativeProtocolDataclasses:
         )
 
         assert metadata.territory_code == "LV"
+        assert metadata.default_locale == "lv_lv"
         assert metadata.currencies == ("EUR",)
 
         with pytest.raises(TypeError, match="pack_code must be str"):
@@ -126,6 +127,14 @@ class TestLegislativeProtocolDataclasses:
                 tax_year=2026,
                 default_locale="lv-LV",
                 currencies=cast("Any", {"EUR"}),
+            )
+        with pytest.raises(ValueError, match="Invalid default_locale"):
+            LegislativePackMetadata(
+                pack_code="lv.standard.2026",
+                territory_code="LV",
+                tax_year=2026,
+                default_locale="lv/LV",
+                currencies=("EUR",),
             )
 
     def test_issue_and_validation_result_enforce_shape(self) -> None:

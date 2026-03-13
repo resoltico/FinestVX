@@ -2,30 +2,16 @@
 
 from __future__ import annotations
 
-from ftllexengine import ParseResult
-from ftllexengine.parsing import parse_currency, parse_date, parse_datetime, parse_decimal
-from ftllexengine.runtime.function_bridge import FluentNumber
-
-from finestvx.core.serialization import fluent_number_from_decimal
+from ftllexengine import FluentNumber, ParseResult, make_fluent_number
+from ftllexengine.parsing import parse_decimal
 
 __all__ = [
     "AmountParseResult",
     "parse_amount_input",
-    "parse_currency_input",
-    "parse_date_input",
-    "parse_datetime_input",
-    "parse_decimal_input",
 ]
 
 type AmountParseResult = ParseResult[FluentNumber]
 """Return type for localized amount parsing into ``FluentNumber`` values."""
-
-# Direct re-exports of FTLLexEngine parsing functions under FinestVX input naming.
-# These are aliases, not wrappers: no implementation overhead, full signature fidelity.
-parse_decimal_input = parse_decimal
-parse_date_input = parse_date
-parse_datetime_input = parse_datetime
-parse_currency_input = parse_currency
 
 
 def parse_amount_input(value: str, locale_code: str) -> AmountParseResult:
@@ -33,4 +19,4 @@ def parse_amount_input(value: str, locale_code: str) -> AmountParseResult:
     parsed, errors = parse_decimal(value, locale_code)
     if parsed is None:
         return (None, errors)
-    return (fluent_number_from_decimal(parsed), errors)
+    return (make_fluent_number(parsed), errors)

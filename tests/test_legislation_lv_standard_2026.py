@@ -5,8 +5,8 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from ftllexengine.runtime.function_bridge import FluentNumber
-from ftllexengine.runtime.functions import get_shared_registry
+from ftllexengine import FluentNumber
+from ftllexengine.runtime import get_shared_registry
 
 from finestvx import (
     Account,
@@ -31,7 +31,7 @@ class TestLatviaStandard2026Pack:
         assert pack.metadata.pack_code == "lv.standard.2026"
         assert pack.metadata.territory_code == "LV"
         assert pack.metadata.tax_year == 2026
-        assert pack.metadata.default_locale == "lv-LV"
+        assert pack.metadata.default_locale == "lv_lv"
         assert pack.metadata.currencies == ("EUR",)
 
     def test_function_registry_is_independent_copy(self) -> None:

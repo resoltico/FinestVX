@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
-from ftllexengine.runtime.function_bridge import FluentNumber
+from ftllexengine import FluentNumber
 
 from finestvx.core import (
     Account,

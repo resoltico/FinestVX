@@ -11,6 +11,8 @@ RETRIEVAL_HINTS:
 
 FinestVX is a headless, country-agnostic bookkeeping core engine. The goal is an embeddable double-entry ledger that can serve as the financial backbone of larger application.
 
+FinestVX treats FTLLexEngine as a platform dependency, not a copy source: locale normalization, localization boot integrity, raw reverse parsing, and `FluentNumber` construction come from FTLLexEngine directly, while FinestVX keeps only bookkeeping-specific orchestration on top.
+
 ## Vision
 
 - **Double-entry ledger** with zero-sum enforcement per currency per transaction

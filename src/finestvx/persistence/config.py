@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ftllexengine.runtime.cache_config import CacheConfig
+from ftllexengine import CacheConfig
 
 __all__ = [
     "MANDATED_CACHE_CONFIG",

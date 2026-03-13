@@ -2,81 +2,33 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
 
 import pytest
+from ftllexengine import clear_module_caches
+from ftllexengine.core.locale_utils import normalize_locale
 from ftllexengine.integrity import IntegrityCheckFailedError, SyntaxIntegrityError
+from ftllexengine.localization import FallbackInfo
 
-import finestvx.localization.service as localization_module
 from finestvx.legislation.lv import LatviaStandard2026Pack
-from finestvx.localization import LocalizationConfig, LocalizationService
+from finestvx.localization import LocalizationConfig, create_localization
 
-
-@dataclass(frozen=True)
-class _FakeJunkResult:
-    """Minimal junk result for localization-summary failure tests."""
-
-    resource_id: str
-    source_path: Path
-
-
-@dataclass(frozen=True)
-class _FakeErrorResult:
-    """Minimal error result for localization-summary failure tests."""
-
-    resource_id: str
-    locale: str
-    error: Exception
-
-
-@dataclass(frozen=True)
-class _FakeMissingResult:
-    """Minimal not-found result for localization-summary failure tests."""
-
-    resource_id: str
-    locale: str
-
-
-@dataclass(frozen=True)
-class _FakeSummary:
-    """Minimal load summary matching the wrapper's needs."""
-
-    has_junk: bool = False
-    junk_results: tuple[_FakeJunkResult, ...] = ()
-    error_results: tuple[_FakeErrorResult, ...] = ()
-    missing_results: tuple[_FakeMissingResult, ...] = ()
-
-    def get_with_junk(self) -> tuple[_FakeJunkResult, ...]:
-        """Return junk-bearing results."""
-        return self.junk_results
-
-    def get_all_junk(self) -> tuple[str, ...]:
-        """Return placeholder junk entries."""
-        return ("junk-entry",)
-
-    def get_errors(self) -> tuple[_FakeErrorResult, ...]:
-        """Return load errors."""
-        return self.error_results
-
-    def get_not_found(self) -> tuple[_FakeMissingResult, ...]:
-        """Return missing resources."""
-        return self.missing_results
+_LV_LOCALE = normalize_locale("lv-LV")
+_EN_LOCALE = normalize_locale("en-US")
 
 
 class TestLocalizationServiceEdges:
-    """Boot validation, fallback auditing, and pass-through helpers."""
+    """Boot validation, locale normalization, and direct FTLLexEngine helpers."""
 
-    def test_config_normalizes_paths_and_rejects_empty_inputs(self, tmp_path: Path) -> None:
-        """Localization config stores tuple/path values and rejects empty collections."""
+    def test_config_normalizes_locales_and_rejects_invalid_inputs(self, tmp_path: Path) -> None:
+        """LocalizationConfig stores canonical locale codes and rejects invalid input."""
         config = LocalizationConfig(
             locales=["lv-LV", "en-US"],
             resource_ids=["app.ftl"],
             base_path=tmp_path / "{locale}",
         )
 
-        assert config.locales == ("lv-LV", "en-US")
+        assert config.locales == (_LV_LOCALE, _EN_LOCALE)
         assert config.resource_ids == ("app.ftl",)
         assert config.base_path == tmp_path / "{locale}"
 
@@ -92,92 +44,65 @@ class TestLocalizationServiceEdges:
                 resource_ids=(),
                 base_path=tmp_path / "{locale}",
             )
+        with pytest.raises(ValueError, match="Invalid locales"):
+            LocalizationConfig(
+                locales=("lv/LV",),
+                resource_ids=("app.ftl",),
+                base_path=tmp_path / "{locale}",
+            )
+        with pytest.raises(ValueError, match="unique after normalization"):
+            LocalizationConfig(
+                locales=("lv-LV", "lv_lv"),
+                resource_ids=("app.ftl",),
+                base_path=tmp_path / "{locale}",
+            )
 
-    def test_unclean_boot_raises_for_junk_error_and_missing_resources(self, tmp_path: Path) -> None:
-        """Boot-time validation translates load-summary failures into integrity exceptions."""
-        junk_path = tmp_path / "junk"
-        (junk_path / "lv-LV").mkdir(parents=True)
-        (junk_path / "lv-LV" / "app.ftl").write_text("broken = {\n", encoding="utf-8")
-        with pytest.raises(SyntaxIntegrityError, match="syntax error"):
-            LocalizationService(
+    def test_strict_boot_raises_on_broken_and_missing_resources(self, tmp_path: Path) -> None:
+        """Strict boot propagates upstream require_clean failures directly."""
+        broken_path = tmp_path / "broken"
+        (broken_path / _LV_LOCALE).mkdir(parents=True)
+        (broken_path / _LV_LOCALE / "app.ftl").write_text("broken = {\n", encoding="utf-8")
+
+        with pytest.raises(SyntaxIntegrityError, match="Strict mode"):
+            create_localization(
                 LocalizationConfig(
                     locales=("lv-LV",),
                     resource_ids=("app.ftl",),
-                    base_path=junk_path / "{locale}",
+                    base_path=broken_path / "{locale}",
                 )
             )
-        with pytest.raises(
-            SyntaxIntegrityError,
-            match="Localization resources contain Junk entries",
-        ):
-            LocalizationService._raise_for_unclean_summary(
-                cast(
-                    "Any",
-                    _FakeSummary(
-                        has_junk=True,
-                        junk_results=(
-                            _FakeJunkResult(
-                                resource_id="app.ftl",
-                                source_path=junk_path / "lv-LV" / "app.ftl",
-                            ),
-                        ),
-                    ),
-                ),
-            )
 
-        with pytest.raises(
-            IntegrityCheckFailedError,
-            match="Localization resource loading failed",
-        ):
-            LocalizationService._raise_for_unclean_summary(
-                cast(
-                    "Any",
-                    _FakeSummary(
-                        error_results=(
-                            _FakeErrorResult(
-                                resource_id="app.ftl",
-                                locale="lv-LV",
-                                error=OSError("disk error"),
-                            ),
-                        ),
-                    ),
-                ),
-            )
-        with pytest.raises(IntegrityCheckFailedError, match="Localization resource missing"):
-            LocalizationService._raise_for_unclean_summary(
-                cast(
-                    "Any",
-                    _FakeSummary(
-                        missing_results=(
-                            _FakeMissingResult(resource_id="app.ftl", locale="lv-LV"),
-                        ),
-                    ),
+        with pytest.raises(IntegrityCheckFailedError, match="Localization initialization is not clean"):
+            create_localization(
+                LocalizationConfig(
+                    locales=("lv-LV",),
+                    resource_ids=("missing.ftl",),
+                    base_path=broken_path / "{locale}",
                 )
             )
 
     def test_service_records_fallbacks_and_exposes_pass_through_helpers(
         self,
-        monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path,
     ) -> None:
-        """The wrapper exposes formatting, cache stats, and function registration."""
+        """The constructor returns a usable FTLLexEngine localization runtime."""
         base_path = tmp_path / "locales"
-        (base_path / "lv-LV").mkdir(parents=True)
-        (base_path / "en-US").mkdir(parents=True)
-        (base_path / "lv-LV" / "app.ftl").write_text(
+        (base_path / _LV_LOCALE).mkdir(parents=True)
+        (base_path / _EN_LOCALE).mkdir(parents=True)
+        (base_path / _LV_LOCALE / "app.ftl").write_text(
             "-brand = FinestVX\n"
             "message = Primary\n"
             "    .hint = Primary hint\n"
             "schema-message = Sveiks, { $name }!\n",
             encoding="utf-8",
         )
-        (base_path / "en-US" / "app.ftl").write_text(
+        (base_path / _EN_LOCALE / "app.ftl").write_text(
             "fallback-message = Fallback\n",
             encoding="utf-8",
         )
 
-        callback_events: list[object] = []
-        service = LocalizationService(
+        callback_events: list[FallbackInfo] = []
+        service = create_localization(
             LocalizationConfig(
                 locales=("lv-LV", "en-US"),
                 resource_ids=("app.ftl",),
@@ -189,13 +114,6 @@ class TestLocalizationServiceEdges:
         hint_value, hint_errors = service.format_pattern("message", attribute="hint")
         fallback_value, fallback_errors = service.format_value("fallback-message")
 
-        clear_calls: list[str] = []
-        monkeypatch.setattr(
-            localization_module,
-            "clear_module_caches",
-            lambda: clear_calls.append("ok"),
-        )
-
         service.add_function("ECHO", lambda: "x")
         message = service.get_message("schema-message")
         term = service.get_term("brand")
@@ -203,12 +121,15 @@ class TestLocalizationServiceEdges:
             "schema-message",
             frozenset({"name"}),
         )
+        schema_results = service.validate_message_schemas(
+            {"schema-message": frozenset({"name"})}
+        )
         cache_stats = service.get_cache_stats()
         cache_audit_log = service.get_cache_audit_log()
         service.clear_cache()
-        service.clear_module_caches()
+        clear_module_caches()
 
-        assert service.summary.all_clean is True
+        assert service.get_load_summary().all_clean is True
         assert service.cache_enabled is True
         assert service.cache_config is not None
         assert service.cache_config.enable_audit is True
@@ -220,15 +141,16 @@ class TestLocalizationServiceEdges:
         assert term is not None
         assert schema_result.is_valid is True
         assert schema_result.declared_variables == frozenset({"name"})
-        assert len(service.fallback_events) == 1
+        assert len(schema_results) == 1
+        assert schema_results[0] == schema_result
         assert len(callback_events) == 1
+        assert callback_events[0].resolved_locale == _EN_LOCALE
         assert cache_stats is not None
         assert cache_stats["audit_enabled"] is True
         assert cache_audit_log is not None
-        assert set(cache_audit_log) == {"en-US", "lv-LV"}
-        assert len(cache_audit_log["lv-LV"]) > 0
-        assert len(cache_audit_log["en-US"]) > 0
-        assert clear_calls == ["ok"]
+        assert set(cache_audit_log) == {_EN_LOCALE, _LV_LOCALE}
+        assert len(cache_audit_log[_LV_LOCALE]) > 0
+        assert len(cache_audit_log[_EN_LOCALE]) > 0
 
     def test_pack_localization_exposes_cache_stats(self) -> None:
         """Pack-provided localization services are usable directly."""
@@ -241,12 +163,12 @@ class TestLocalizationServiceEdges:
         assert errors == ()
         assert service.get_cache_stats() is not None
         assert cache_audit_log is not None
-        assert "lv-LV" in cache_audit_log
+        assert _LV_LOCALE in cache_audit_log
 
     def test_config_message_variable_schemas_normalizes_set_to_frozenset(
         self, tmp_path: Path
     ) -> None:
-        """LocalizationConfig normalizes schema values to frozenset at construction time."""
+        """LocalizationConfig stores schema sets as frozenset values."""
         config = LocalizationConfig(
             locales=("lv-LV",),
             resource_ids=("app.ftl",),
@@ -270,19 +192,19 @@ class TestLocalizationServiceEdges:
         assert config.message_variable_schemas == {}
 
     def test_schema_validation_rejects_unknown_message_id(self, tmp_path: Path) -> None:
-        """Boot fails when the schema references a message absent from all locales."""
+        """Boot fails when schema validation names a missing message."""
         base_path = tmp_path / "locales"
-        (base_path / "lv-LV").mkdir(parents=True)
-        (base_path / "lv-LV" / "app.ftl").write_text(
+        (base_path / _LV_LOCALE).mkdir(parents=True)
+        (base_path / _LV_LOCALE / "app.ftl").write_text(
             "greeting = Sveiks!\n",
             encoding="utf-8",
         )
 
         with pytest.raises(
             IntegrityCheckFailedError,
-            match="not found in any locale",
+            match="Localization message schema validation failed",
         ):
-            LocalizationService(
+            create_localization(
                 LocalizationConfig(
                     locales=("lv-LV",),
                     resource_ids=("app.ftl",),
@@ -294,25 +216,24 @@ class TestLocalizationServiceEdges:
     def test_schema_validation_error_message_names_both_missing_and_extra(
         self, tmp_path: Path
     ) -> None:
-        """Error message includes both missing and extra variable names when both are present."""
+        """Schema mismatch errors include both missing and extra variable groups."""
         base_path = tmp_path / "locales"
-        (base_path / "lv-LV").mkdir(parents=True)
-        (base_path / "lv-LV" / "app.ftl").write_text(
+        (base_path / _LV_LOCALE).mkdir(parents=True)
+        (base_path / _LV_LOCALE / "app.ftl").write_text(
             "invoice = Nr. { $ref } summa { $amount }\n",
             encoding="utf-8",
         )
 
         with pytest.raises(IntegrityCheckFailedError) as exc_info:
-            LocalizationService(
+            create_localization(
                 LocalizationConfig(
                     locales=("lv-LV",),
                     resource_ids=("app.ftl",),
                     base_path=base_path / "{locale}",
-                    # schema expects 'id' and 'total' but FTL declares 'ref' and 'amount'
                     message_variable_schemas={"invoice": frozenset({"id", "total"})},
                 )
             )
 
         error_text = str(exc_info.value)
-        assert "missing=" in error_text
-        assert "extra=" in error_text
+        assert "missing {" in error_text
+        assert "extra {" in error_text

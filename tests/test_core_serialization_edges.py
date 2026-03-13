@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime
 from decimal import Decimal
-from typing import Any, cast
 
 import pytest
+from ftllexengine import make_fluent_number
 from ftllexengine.core.fiscal import FiscalCalendar, FiscalPeriod
 
 import finestvx.core.serialization as serialization_module
@@ -15,25 +15,11 @@ from finestvx.core.enums import FiscalPeriodState, TransactionState
 from finestvx.core.serialization import (
     book_from_mapping,
     book_to_mapping,
-    fluent_number_from_decimal,
     transaction_from_mapping,
     transaction_to_mapping,
 )
 
 _POSTED_AT = datetime(2026, 1, 15, 9, 30, tzinfo=UTC)
-
-
-class _FakeDecimalLike:
-    """Minimal object for forcing an invalid exponent type."""
-
-    class _Tuple:
-        """Value tuple with a wrong exponent type."""
-
-        exponent = "bad"
-
-    def as_tuple(self) -> _Tuple:
-        """Return the fake tuple shape expected by the helper."""
-        return self._Tuple()
 
 
 class TestSerializationHelpers:
@@ -53,7 +39,7 @@ class TestSerializationHelpers:
                 LedgerEntry(
                     account_code="1100",
                     side=PostingSide.DEBIT,
-                    amount=fluent_number_from_decimal(Decimal("12.34"), formatted="12,34"),
+                    amount=make_fluent_number(Decimal("12.34"), formatted="12,34"),
                     currency="EUR",
                     description="Debit line",
                     tax_rate=Decimal("0.21"),
@@ -61,7 +47,7 @@ class TestSerializationHelpers:
                 LedgerEntry(
                     account_code="2100",
                     side=PostingSide.CREDIT,
-                    amount=fluent_number_from_decimal(Decimal("12.34")),
+                    amount=make_fluent_number(Decimal("12.34")),
                     currency="EUR",
                 ),
             ),
@@ -135,8 +121,6 @@ class TestSerializationHelpers:
             serialization_module._require_int(True, "start_month")
         with pytest.raises(TypeError, match="amount must be decimal text"):
             serialization_module._require_decimal(1, "amount")
-        with pytest.raises(TypeError, match="decimal exponent must be int"):
-            serialization_module._decimal_precision(cast("Any", _FakeDecimalLike()))
 
     def test_public_deserializers_report_type_mismatches(self) -> None:
         """Public mapping loaders surface field-level typing errors."""

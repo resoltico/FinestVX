@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from ftllexengine.introspection.iso import CurrencyCode
-from ftllexengine.runtime.function_bridge import FluentNumber
+from ftllexengine import FluentNumber
+from ftllexengine.introspection import CurrencyCode
 
 type AccountCode = str
 """Canonical chart-of-accounts code."""

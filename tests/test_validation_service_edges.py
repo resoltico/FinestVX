@@ -8,11 +8,11 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
-from ftllexengine.diagnostics.validation import WarningSeverity
+from ftllexengine import make_fluent_number
+from ftllexengine.diagnostics import WarningSeverity
 
 import finestvx.validation.service as validation_module
 from finestvx.core import Account, JournalTransaction, LedgerEntry, PostingSide, TransactionState
-from finestvx.core.serialization import fluent_number_from_decimal
 from finestvx.validation import validate_book, validate_ftl_resource, validate_transaction
 from tests.support.book_factory import build_posted_transaction, build_sample_book
 
@@ -72,7 +72,7 @@ class TestValidationServiceEdges:
                 LedgerEntry(
                     account_code="1000",
                     side=PostingSide.DEBIT,
-                    amount=fluent_number_from_decimal(Decimal("10.00")),
+                    amount=make_fluent_number(Decimal("10.00")),
                     currency="EUR",
                 ),
             ),
