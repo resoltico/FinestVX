@@ -42,7 +42,6 @@ if TYPE_CHECKING:
         create_default_pack_registry,
         validate_transaction_isolated,
     )
-    from .localization import LocalizationConfig, create_localization
     from .persistence import (
         MANDATED_CACHE_CONFIG,
         AsyncLedgerReader,
@@ -109,7 +108,6 @@ __all__ = [
     "LegislativePackMetadata",
     "LegislativePackRegistry",
     "LegislativeValidationResult",
-    "LocalizationConfig",
     "PersistenceConfig",
     "PostedTransactionResult",
     "PostingSide",
@@ -130,7 +128,6 @@ __all__ = [
     "ValidationReport",
     "ValidationSeverity",
     "create_default_pack_registry",
-    "create_localization",
     "create_snapshot",
     "validate_book",
     "validate_chart_of_accounts",
@@ -174,7 +171,6 @@ _EXPORT_MAP: dict[str, tuple[str, str]] = {
         "finestvx.legislation",
         "LegislativeValidationResult",
     ),
-    "LocalizationConfig": ("finestvx.localization", "LocalizationConfig"),
     "MANDATED_CACHE_CONFIG": ("finestvx.persistence", "MANDATED_CACHE_CONFIG"),
     "PersistenceConfig": ("finestvx.persistence", "PersistenceConfig"),
     "PostedTransactionResult": ("finestvx.gateway", "PostedTransactionResult"),
@@ -195,7 +191,6 @@ _EXPORT_MAP: dict[str, tuple[str, str]] = {
     "ValidationFinding": ("finestvx.validation", "ValidationFinding"),
     "ValidationReport": ("finestvx.validation", "ValidationReport"),
     "ValidationSeverity": ("finestvx.validation", "ValidationSeverity"),
-    "create_localization": ("finestvx.localization", "create_localization"),
     "create_default_pack_registry": (
         "finestvx.legislation",
         "create_default_pack_registry",

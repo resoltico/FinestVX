@@ -1,8 +1,8 @@
 ---
 afad: "3.3"
-version: "0.4.0"
+version: "0.5.0"
 domain: SECONDARY
-updated: "2026-03-13"
+updated: "2026-03-16"
 route:
   keywords: [legislative pack, pack protocol, pack registry, pack metadata, legislative issue, legislative result, subinterpreters, latvia 2026, function registry isolation]
   questions: ["how does the finestvx plugin system work?", "what is an ILegislativePack?", "how are packs isolated at runtime?", "how is the Latvia pack implemented?", "how do i add a jurisdiction pack?"]
@@ -107,6 +107,8 @@ class ILegislativePack(Protocol):
 - `function_registry` must be a pack-local unfrozen copy of the shared FTLLexEngine registry.
 - `validate_transaction`: business-rule validation; returns result, never raises on rule failures.
 - `create_localization`: returns a strict `FluentLocalization` for pack-local FTL resources.
+- Implementations should delegate boot assembly to `ftllexengine.localization.LocalizationBootConfig`
+  and apply `MANDATED_CACHE_CONFIG` instead of recreating loader/boot logic locally.
 
 ---
 
@@ -161,7 +163,8 @@ class LatviaStandard2026Pack:
 - `metadata.pack_code == "lv.standard.2026"`, `territory_code == "LV"`, `tax_year == 2026`, `currencies == ("EUR",)`.
 - Validation rule: any ledger entry with a non-`None` `tax_rate` not equal to `Decimal("0.21")` is flagged.
 - Validation rule: `book.legislative_pack != "lv.standard.2026"` is flagged.
-- `create_localization` loads FTL assets from `locales/lv_lv/` and `locales/en_us/` with strict boot.
+- `create_localization` loads FTL assets from `locales/lv_lv/` and `locales/en_us/` via
+  `LocalizationBootConfig.from_path(...).boot()` with `MANDATED_CACHE_CONFIG`.
 - Custom FTL function `ROUND_EUR` is registered via `@fluent_function`; quantizes financial amounts to 2 decimal places using `ROUND_HALF_UP`. FTL usage: `{ ROUND_EUR($amount) }`.
 - FTL messages: `latvia-pack-name`, `vat-standard-rate`, `vat-amount`.
 

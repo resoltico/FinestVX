@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -52,6 +53,11 @@ class ValidationReport:
             for finding in self.findings
             if finding.severity is ValidationSeverity.ERROR
         )
-        context = IntegrityContext(component=component, operation=operation)
+        context = IntegrityContext(
+            component=component,
+            operation=operation,
+            timestamp=time.monotonic(),
+            wall_time_unix=time.time(),
+        )
         msg = f"Validation failed: {error_codes}"
         raise IntegrityCheckFailedError(msg, context=context)

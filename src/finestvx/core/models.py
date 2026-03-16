@@ -118,19 +118,12 @@ def _coerce_tuple[T](value: object, field_name: str) -> tuple[T, ...]:
     raise TypeError(msg)
 
 
-def _amount_as_decimal(amount: object) -> Decimal:
-    """Convert a ``FluentNumber`` amount into a decimal value for balancing."""
-    if not isinstance(amount, FluentNumber):
-        msg = f"amount must be FluentNumber, got {type(amount).__name__}"
+def _require_fluent_number(value: object, field_name: str) -> FluentNumber:
+    """Validate a ``FluentNumber`` runtime value."""
+    if not isinstance(value, FluentNumber):
+        msg = f"{field_name} must be FluentNumber, got {type(value).__name__}"
         raise TypeError(msg)
-    match amount.value:
-        case int() as integer_value:
-            return Decimal(integer_value)
-        case Decimal() as decimal_value:
-            if not decimal_value.is_finite():
-                msg = "amount value must be finite"
-                raise ValueError(msg)
-            return decimal_value
+    return value
 
 
 def _require_posting_side(value: object, field_name: str) -> PostingSide:
@@ -390,7 +383,11 @@ class LedgerEntry:
             _require_non_empty_text(self.account_code, "account_code"),
         )
         object.__setattr__(self, "side", _require_posting_side(self.side, "side"))
-        decimal_value = _amount_as_decimal(self.amount)
+        object.__setattr__(self, "amount", _require_fluent_number(self.amount, "amount"))
+        decimal_value = self.amount.decimal_value
+        if not decimal_value.is_finite():
+            msg = "amount value must be finite"
+            raise ValueError(msg)
         if decimal_value < _ZERO:
             msg = "amount must be non-negative"
             raise ValueError(msg)
@@ -416,7 +413,7 @@ class LedgerEntry:
     @property
     def decimal_value(self) -> Decimal:
         """Return the numeric value used for balancing calculations."""
-        return _amount_as_decimal(self.amount)
+        return self.amount.decimal_value
 
 
 @dataclass(frozen=True, slots=True)

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import finestvx
-from finestvx import LocalizationConfig, create_localization
 
 
 class TestPackageInit:
@@ -19,24 +18,16 @@ class TestPackageInit:
         for export_name in finestvx.__all__:
             assert hasattr(finestvx, export_name)
 
-    def test_create_localization_is_accessible(self) -> None:
-        """create_localization remains available at the FinestVX package root."""
-        assert create_localization is finestvx.create_localization
-        assert LocalizationConfig is finestvx.LocalizationConfig
-
-    def test_removed_raw_parse_aliases_are_not_exported(self) -> None:
-        """FinestVX no longer re-exports FTLLexEngine parsing or utility helpers."""
+    def test_removed_platform_proxy_exports_are_not_exported(self) -> None:
+        """FinestVX no longer re-exports deleted platform-boundary helper symbols."""
         for removed_name in (
             "AmountParseResult",
             "FiscalDelta",
             "MonthEndPolicy",
             "get_cldr_version",
+            "LocalizationConfig",
             "LocalizationService",
-            "parse_amount_input",
-            "parse_decimal_input",
-            "parse_date_input",
-            "parse_datetime_input",
-            "parse_currency_input",
+            "create_localization",
         ):
             assert removed_name not in finestvx.__all__
             assert hasattr(finestvx, removed_name) is False

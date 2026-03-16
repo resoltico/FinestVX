@@ -14,12 +14,11 @@ from finestvx.legislation import (
 from finestvx.persistence import AuditContext, DatabaseSnapshot, StoreWriteReceipt
 from finestvx.runtime import LedgerRuntime, RuntimeConfig, RuntimeDebugSnapshot
 from finestvx.validation import (
-    ValidationFinding,
     ValidationReport,
-    ValidationSeverity,
     validate_legislative_transaction,
     validate_transaction,
 )
+from finestvx.validation.service import report_from_legislative_result
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -147,16 +146,8 @@ class FinestVXService:
         book = self.get_book(book_code)
         core_report = validate_transaction(book, transaction)
         result = self.interpreter_runner.validate(book.legislative_pack, book, transaction)
-        legislative_findings = tuple(
-            ValidationFinding(
-                code=issue.code,
-                message=issue.message,
-                severity=ValidationSeverity.ERROR,
-                source=f"legislation.{result.pack_code}",
-            )
-            for issue in result.issues
-        )
-        return ValidationReport(core_report.findings + legislative_findings)
+        legislative_report = report_from_legislative_result(result)
+        return ValidationReport(core_report.findings + legislative_report.findings)
 
     def export_book(self, book_code: str, format_name: ExportFormat) -> ExportArtifact:
         """Export a stored book into the selected deterministic artifact format."""

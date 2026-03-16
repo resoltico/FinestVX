@@ -1,6 +1,6 @@
 ---
 afad: "3.3"
-version: "0.4.0"
+version: "0.5.0"
 domain: AUXILIARY
 updated: "2026-03-13"
 route:

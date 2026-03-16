@@ -1,8 +1,8 @@
 ---
 afad: "3.3"
-version: "0.4.0"
+version: "0.5.0"
 domain: AUXILIARY
-updated: "2026-03-13"
+updated: "2026-03-16"
 route:
   keywords: [plugin system, legislative pack, registry copy, subinterpreters, localization assets, extension workflow]
   questions: ["how does the finestvx plugin system work today?", "how do i add a jurisdiction pack?", "why does each pack get its own function registry copy?", "how are packs isolated at runtime?", "what does the service do after posting?"]
@@ -19,7 +19,7 @@ That means it must provide:
 - immutable metadata;
 - a pack-local `FunctionRegistry` copy;
 - `validate_transaction()`;
-- `create_localization()`.
+- `create_localization()` backed by FTLLexEngine `LocalizationBootConfig`.
 
 ## Registration Model
 
@@ -59,6 +59,7 @@ When adding a new jurisdiction:
 2. copy the shared function registry;
 3. implement validation rules;
 4. implement strict pack-local localization loading;
+   use `LocalizationBootConfig` with `MANDATED_CACHE_CONFIG`
 5. register the pack in an explicit bootstrap path;
 6. add unit, integration, and isolated-validation tests;
 7. update the AFAD documentation set.

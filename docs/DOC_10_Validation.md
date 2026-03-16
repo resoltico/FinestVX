@@ -1,8 +1,8 @@
 ---
 afad: "3.3"
-version: "0.4.0"
+version: "0.5.0"
 domain: PRIMARY
-updated: "2026-03-13"
+updated: "2026-03-16"
 route:
   keywords: [validation report, validation finding, validation severity, validate book, validate transaction, ftl resource validation, legislative validation]
   questions: ["how do i validate a transaction?", "what is a ValidationReport?", "how does finestvx report validation errors?", "how do i validate an ftl resource?", "how do i validate against a legislative pack?"]
@@ -78,6 +78,8 @@ class ValidationReport:
 - `findings` defaults to an empty tuple; an empty report is always accepted.
 - `accepted`: `True` when no finding carries `ValidationSeverity.ERROR`; warnings and info do not block.
 - `require_valid`: raises `ftllexengine.integrity.IntegrityCheckFailedError` when `not accepted`; used at hard-fail boundaries.
+- `require_valid` populates both monotonic `timestamp` and wall-clock `wall_time_unix` in the
+  raised `IntegrityContext`.
 - Combining reports: `ValidationReport(report_a.findings + report_b.findings)`.
 
 ---

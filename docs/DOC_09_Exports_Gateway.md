@@ -1,8 +1,8 @@
 ---
 afad: "3.3"
-version: "0.4.0"
+version: "0.5.0"
 domain: SECONDARY
-updated: "2026-03-13"
+updated: "2026-03-15"
 route:
   keywords: [export artifact, ledger exporter, runtime config, ledger runtime, posted transaction result, service facade, gateway debug snapshot, runtime debug snapshot]
   questions: ["how does LedgerRuntime work now?", "what does FinestVXService return on writes?", "what runtime debug data is available?", "how are artifacts exported?", "what is PostedTransactionResult?"]

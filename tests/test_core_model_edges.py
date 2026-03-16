@@ -42,14 +42,17 @@ class TestCoreModelHelpers:
     def test_amount_and_enum_helpers_reject_invalid_values(self) -> None:
         """Amount coercion and enum validators defend against bad runtime types."""
         with pytest.raises(TypeError, match="amount must be FluentNumber"):
-            models_module._amount_as_decimal("1.00")
+            models_module._require_fluent_number("1.00", "amount")
 
         integer_amount = FluentNumber(value=10, formatted="10", precision=0)
-        assert models_module._amount_as_decimal(integer_amount) == Decimal(10)
+        assert models_module._require_fluent_number(integer_amount, "amount") is integer_amount
 
         with pytest.raises(ValueError, match="amount value must be finite"):
-            models_module._amount_as_decimal(
-                FluentNumber(value=Decimal("Infinity"), formatted="Infinity", precision=0)
+            LedgerEntry(
+                account_code="1000",
+                side=PostingSide.DEBIT,
+                amount=FluentNumber(value=Decimal("Infinity"), formatted="Infinity", precision=0),
+                currency="EUR",
             )
 
         with pytest.raises(TypeError, match="side must be PostingSide"):

@@ -8,20 +8,16 @@ from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from ftllexengine import make_fluent_number
-from ftllexengine.runtime import (
-    FluentNumber,
-    FunctionRegistry,
-    fluent_function,
-    get_shared_registry,
-)
+from ftllexengine import FluentNumber, make_fluent_number
+from ftllexengine.localization import LocalizationBootConfig
+from ftllexengine.runtime import FunctionRegistry, fluent_function, get_shared_registry
 
 from finestvx.legislation.protocols import (
     LegislativeIssue,
     LegislativePackMetadata,
     LegislativeValidationResult,
 )
-from finestvx.localization import LocalizationConfig, create_localization
+from finestvx.persistence import MANDATED_CACHE_CONFIG
 
 if TYPE_CHECKING:
     from ftllexengine.localization import FluentLocalization
@@ -43,13 +39,10 @@ def round_eur(value: FluentNumber) -> FluentNumber:
     Ensures EUR amounts always carry exactly two decimal places for display in
     Latvian tax documents and VAT summaries.
     """
-    match value.value:
-        case int() as integer_value:
-            quantized = Decimal(integer_value).quantize(_EUR_QUANTIZE, rounding=_ROUND_HALF_UP)
-        case Decimal() as decimal_val if decimal_val.is_finite():
-            quantized = decimal_val.quantize(_EUR_QUANTIZE, rounding=_ROUND_HALF_UP)
-        case _:
-            return value
+    decimal_value = value.decimal_value
+    if not decimal_value.is_finite():
+        return value
+    quantized = decimal_value.quantize(_EUR_QUANTIZE, rounding=_ROUND_HALF_UP)
     return make_fluent_number(quantized)
 
 
@@ -81,12 +74,20 @@ class LatviaStandard2026Pack:
     def create_localization(self) -> FluentLocalization:
         """Create the strict pack-local localization runtime."""
         base_path = Path(__file__).with_name("locales") / "{locale}"
-        config = LocalizationConfig(
+        localization = LocalizationBootConfig.from_path(
             locales=(self.metadata.default_locale, "en_us"),
             resource_ids=("legislation.ftl",),
             base_path=base_path,
-        )
-        return create_localization(config)
+            cache=MANDATED_CACHE_CONFIG,
+        ).boot()
+        shared_registry = get_shared_registry()
+        for function_name in self.function_registry:
+            if shared_registry.has_function(function_name):
+                continue
+            function = self.function_registry.get_callable(function_name)
+            if function is not None:
+                localization.add_function(function_name, function)
+        return localization
 
     def validate_transaction(
         self,

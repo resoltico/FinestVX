@@ -34,10 +34,6 @@ from .legislation import LegislativePackRegistry as LegislativePackRegistry
 from .legislation import LegislativeValidationResult as LegislativeValidationResult
 from .legislation import create_default_pack_registry as create_default_pack_registry
 from .legislation import validate_transaction_isolated as validate_transaction_isolated
-
-# Localization layer
-from .localization import LocalizationConfig as LocalizationConfig
-from .localization import create_localization as create_localization
 from .persistence import MANDATED_CACHE_CONFIG as MANDATED_CACHE_CONFIG
 
 # Persistence layer
@@ -103,7 +99,6 @@ __all__: list[str] = [
     "LegislativePackMetadata",
     "LegislativePackRegistry",
     "LegislativeValidationResult",
-    "LocalizationConfig",
     "PersistenceConfig",
     "PostedTransactionResult",
     "PostingSide",
@@ -124,7 +119,6 @@ __all__: list[str] = [
     "ValidationReport",
     "ValidationSeverity",
     "create_default_pack_registry",
-    "create_localization",
     "create_snapshot",
     "validate_book",
     "validate_chart_of_accounts",

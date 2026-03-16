@@ -1,58 +1,16 @@
-"""Tests for FinestVX validation-report and legislative protocol dataclasses."""
+"""Tests for FinestVX legislative protocol dataclasses."""
 
 from __future__ import annotations
 
 from typing import Any, cast
 
 import pytest
-from ftllexengine.integrity import IntegrityCheckFailedError
 
 from finestvx.legislation import (
     LegislativeIssue,
     LegislativePackMetadata,
     LegislativeValidationResult,
 )
-from finestvx.validation import ValidationFinding, ValidationReport, ValidationSeverity
-
-
-class TestValidationReport:
-    """Validation report acceptance and failure behavior."""
-
-    def test_acceptance_and_require_valid_behaviour(self) -> None:
-        """Accepted reports pass, invalid reports raise integrity errors."""
-        accepted = ValidationReport(
-            (
-                ValidationFinding(
-                    code="INFO_ONLY",
-                    message="Informational",
-                    severity=ValidationSeverity.INFO,
-                    source="tests",
-                ),
-            )
-        )
-        accepted.require_valid(component="validation", operation="noop")
-        assert accepted.accepted is True
-
-        rejected = ValidationReport(
-            (
-                ValidationFinding(
-                    code="BROKEN_ONE",
-                    message="First error",
-                    severity=ValidationSeverity.ERROR,
-                    source="tests",
-                ),
-                ValidationFinding(
-                    code="BROKEN_TWO",
-                    message="Second error",
-                    severity=ValidationSeverity.ERROR,
-                    source="tests",
-                ),
-            )
-        )
-
-        with pytest.raises(IntegrityCheckFailedError, match="BROKEN_ONE, BROKEN_TWO"):
-            rejected.require_valid(component="validation", operation="commit")
-        assert rejected.accepted is False
 
 
 class TestLegislativeProtocolDataclasses:

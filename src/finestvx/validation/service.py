@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from finestvx.legislation.registry import LegislativePackRegistry
 
 __all__ = [
+    "report_from_legislative_result",
     "validate_book",
     "validate_ftl_resource",
     "validate_legislative_transaction",
@@ -156,7 +157,7 @@ def validate_ftl_resource(
     return ValidationReport(tuple(findings))
 
 
-def _pack_result_to_report(result: LegislativeValidationResult) -> ValidationReport:
+def report_from_legislative_result(result: LegislativeValidationResult) -> ValidationReport:
     """Convert legislative issues into a FinestVX validation report."""
     return ValidationReport(
         tuple(
@@ -179,4 +180,4 @@ def validate_legislative_transaction(
     """Validate a transaction against its configured legislative pack."""
     pack = registry.resolve(book.legislative_pack)
     result = pack.validate_transaction(book, transaction)
-    return _pack_result_to_report(result)
+    return report_from_legislative_result(result)

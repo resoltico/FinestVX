@@ -1,10 +1,10 @@
 ---
 afad: "3.3"
-version: "0.4.0"
+version: "0.5.0"
 domain: AUXILIARY
-updated: "2026-03-13"
+updated: "2026-03-16"
 route:
-  keywords: [ftllexengine dependency map, fluentlocalization, require locale code, validate message variables, make fluent number, parse fluent number, normalized locale code, cache config, rwlock, graph validation, fluent function, cache audit log]
+  keywords: [ftllexengine dependency map, localizationbootconfig, fluentlocalization, require locale code, decimal_value, make fluent number, parse fluent number, normalized locale code, cache config, rwlock, graph validation, fluent function, cache audit log]
   questions: ["what exactly does finestvx use from ftllexengine?", "why does finestvx depend on ftllexengine?", "which upstream primitives are active?", "what security boundaries come from ftllexengine?", "what functionality did finestvx delete in favor of ftllexengine?"]
 ---
 
@@ -17,6 +17,7 @@ FinestVX uses FTLLexEngine as an upstream platform dependency, not as copied pro
 ### Runtime and Concurrency
 - `RWLock`
 - `FluentNumber`
+- `FluentNumber.decimal_value`
 - `make_fluent_number()`
 - `FunctionRegistry`
 - `fluent_function` decorator
@@ -27,6 +28,7 @@ FinestVX uses FTLLexEngine as an upstream platform dependency, not as copied pro
 Why:
 - bounded writer-preference locking via the public `ftllexengine.runtime` facade;
 - float-free value boundaries;
+- exact numeric extraction without local `FluentNumber -> Decimal` conversion helpers;
 - canonical `FluentNumber` construction without local precision helpers;
 - `fluent_function` is the decorator for locale-aware custom FTL functions (e.g., `ROUND_EUR` in Latvia pack);
 - safe plugin function registration;
@@ -61,12 +63,13 @@ Why:
   `FluentLocalization.validate_message_variables()`, and
   `FluentLocalization.validate_message_schemas()` instead of maintaining local summary/schema glue;
 - strict parse failures still surface as `SyntaxIntegrityError` during eager resource loading;
-- `IntegrityContext` structures error payloads for `IntegrityCheckFailedError`;
+- `IntegrityContext` structures error payloads for `IntegrityCheckFailedError`, including both
+  monotonic and wall-clock timestamps for correlation;
 - `FrozenFluentError` is the error type returned by all localized parsing functions.
 
 ### Localization and Parsing
-- `PathResourceLoader`
 - `FluentLocalization`
+- `LocalizationBootConfig`
 - `FluentLocalization.require_clean()`
 - `FluentLocalization.validate_message_variables()`
 - `FluentLocalization.validate_message_schemas()`
@@ -81,6 +84,7 @@ Why:
 
 Why:
 - strict multi-locale formatting;
+- canonical strict boot assembly without a downstream wrapper layer;
 - `require_clean()` is the strict boot-time load-integrity gate;
 - `validate_message_variables()` and `validate_message_schemas()` are the strict boot-time message-contract gates;
 - `FluentLocalization.get_message()`/`get_term()` expose AST nodes for schema validation and
@@ -122,12 +126,18 @@ Why:
 
 FinestVX no longer re-exports FTLLexEngine symbols from its own public API.
 Callers import upstream primitives directly from `ftllexengine`.
+FinestVX also avoids internal FTLLexEngine module paths, so upstream ownership refactors of value
+types or runtime internals do not require downstream source churn.
+FinestVX no longer ships a `finestvx.localization` wrapper package.
 
 ## Functionality FinestVX Deleted in Favor of FTLLexEngine
 
 - local `FluentNumber` construction helpers were removed in favor of `make_fluent_number()`;
+- local `FluentNumber -> Decimal` conversion helpers were removed in favor of
+  `FluentNumber.decimal_value`;
 - local locale-boundary validation helpers were removed in favor of `require_locale_code()`;
-- local localization wrapper classes were removed in favor of returning `FluentLocalization`;
+- local localization wrapper classes and boot-config wrappers were removed in favor of
+  `LocalizationBootConfig` and returning `FluentLocalization`;
 - local one-message and bulk schema wrappers were removed in favor of
   `validate_message_variables()` and `validate_message_schemas()`;
 - local `parse_amount_input` and `AmountParseResult` were removed; callers use

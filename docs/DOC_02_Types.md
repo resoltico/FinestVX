@@ -1,8 +1,8 @@
 ---
 afad: "3.3"
-version: "0.4.0"
+version: "0.5.0"
 domain: TYPES
-updated: "2026-03-13"
+updated: "2026-03-15"
 route:
   keywords: [posting side, transaction state, fiscal period state, account code, book code, legislative pack code, transaction reference, fluent amount, type aliases]
   questions: ["what enums does finestvx define?", "what type aliases exist in the accounting core?", "how are posting directions represented?", "what lifecycle states exist for transactions?", "what lifecycle states exist for fiscal periods?"]

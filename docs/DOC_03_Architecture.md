@@ -1,8 +1,8 @@
 ---
 afad: "3.3"
-version: "0.4.0"
+version: "0.5.0"
 domain: PRIMARY
-updated: "2026-03-13"
+updated: "2026-03-15"
 route:
   keywords: [architecture layers, apsw runtime, reader pool, writer thread, lifecycle lock, subinterpreters, python 3.14, observability]
   questions: ["what architecture is implemented today?", "how does concurrency work now?", "where are the python 3.14 features used?", "how do reads and writes interact?", "what observability surfaces exist?"]

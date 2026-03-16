@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from ftllexengine import FluentNumber
+from ftllexengine import FluentNumber, make_fluent_number
 from hypothesis import event
 from hypothesis import strategies as st
 from hypothesis.strategies import SearchStrategy
@@ -49,14 +49,14 @@ def _track_reference(ref: str) -> str:
 
 
 def _build_fluent_number(value: Decimal) -> FluentNumber:
-    """Create a ``FluentNumber`` preserving decimal scale for tests."""
+    """Create a canonical ``FluentNumber`` while still emitting scale events."""
     exponent = value.as_tuple().exponent
     if not isinstance(exponent, int):
         msg = "decimal exponent must be int for finite decimal values"
         raise TypeError(msg)
     precision = max(-exponent, 0)
     event(f"strategy=amount_precision_{precision}")
-    return FluentNumber(value=value, formatted=format(value, "f"), precision=precision)
+    return make_fluent_number(value)
 
 
 def fluent_amounts() -> SearchStrategy[FluentNumber]:

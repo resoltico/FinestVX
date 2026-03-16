@@ -1,8 +1,8 @@
 ---
 afad: "3.3"
-version: "0.5.0"
+version: "0.6.0"
 domain: CHANGELOG
-updated: "2026-03-13"
+updated: "2026-03-16"
 route:
   keywords: [changelog, release notes, version history, breaking changes, migration, fixed, what's new]
   questions: ["what changed in version X?", "what are the breaking changes?", "what was fixed in the latest release?", "what is the release history?"]
@@ -14,6 +14,27 @@ Notable changes to this project are documented in this file. The format is based
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.6.0] - 2026-03-16
+
+### Changed
+
+- **FTLLexEngine 0.155.0 is now the direct localization and numeric platform boundary**:
+  - removed the `finestvx.localization` package and the package-root `LocalizationConfig` /
+    `create_localization` exports; FinestVX no longer carries a local localization boot wrapper
+  - `LatviaStandard2026Pack.create_localization()` now boots directly with
+    `ftllexengine.localization.LocalizationBootConfig.from_path(...).boot()` and applies
+    `MANDATED_CACHE_CONFIG` at that upstream boundary
+  - `LedgerEntry` validation and the Latvia pack `ROUND_EUR` function now use
+    `FluentNumber.decimal_value` directly instead of reconstructing `Decimal` locally
+  - isolated legislative validation now reuses one centralized
+    `LegislativeValidationResult -> ValidationReport` projection helper
+
+### Fixed
+
+- **Integrity now matches the new platform boundary**:
+  - `ValidationReport.require_valid()` now captures both monotonic and wall-clock timestamps in
+    `IntegrityContext`, matching FTLLexEngine's dual-clock integrity evidence model
 
 ## [0.5.0] - 2026-03-13
 
