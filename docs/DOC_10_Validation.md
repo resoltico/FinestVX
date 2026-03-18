@@ -1,8 +1,8 @@
 ---
 afad: "3.3"
-version: "0.5.0"
+version: "0.7.0"
 domain: PRIMARY
-updated: "2026-03-16"
+updated: "2026-03-17"
 route:
   keywords: [validation report, validation finding, validation severity, validate book, validate transaction, ftl resource validation, legislative validation]
   questions: ["how do i validate a transaction?", "what is a ValidationReport?", "how does finestvx report validation errors?", "how do i validate an ftl resource?", "how do i validate against a legislative pack?"]
@@ -157,6 +157,33 @@ def validate_ftl_resource(
 - Return: `ValidationReport`; delegates to `ftllexengine.validation.validate_resource`.
 - Covers all six passes: syntax, structural duplicates, undefined refs, circular refs, chain depth, semantic compliance.
 - Can be used independently of a `FluentBundle` instance; suitable for CI/CD pipelines.
+
+---
+
+## `validate_ftl_resource_schemas`
+
+Function that validates FTL message variable contracts against declared expected variable sets.
+
+### Signature
+```python
+def validate_ftl_resource_schemas(
+    source: str,
+    expected_schemas: Mapping[str, frozenset[str]],
+) -> ValidationReport:
+```
+
+### Parameters
+| Name | Type | Req | Semantics |
+|:-----|:-----|:----|:----------|
+| `source` | `str` | Y | Raw FTL source text to validate |
+| `expected_schemas` | `Mapping[str, frozenset[str]]` | Y | Map of message ID to expected variable name set |
+
+### Constraints
+- Return: `ValidationReport`; never raises on contract failures.
+- `FTL_SCHEMA_MESSAGE_MISSING` (`ERROR`): a message declared in `expected_schemas` is absent from `source`.
+- `FTL_SCHEMA_MISMATCH` (`ERROR`): a message exists but its declared variable set differs from the expected set.
+- Uses `FluentLocalization.validate_message_variables()` internally.
+- Exported from `finestvx.validation`.
 
 ---
 

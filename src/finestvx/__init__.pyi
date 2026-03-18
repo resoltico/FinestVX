@@ -5,6 +5,7 @@ from .core import Book as Book
 from .core import BookCode as BookCode
 from .core import BookPeriod as BookPeriod
 from .core import FiscalPeriodState as FiscalPeriodState
+from .core import FluentAmount as FluentAmount
 from .core import JournalTransaction as JournalTransaction
 from .core import LedgerEntry as LedgerEntry
 from .core import LegislativePackCode as LegislativePackCode
@@ -64,6 +65,7 @@ from .validation import ValidationReport as ValidationReport
 from .validation import ValidationSeverity as ValidationSeverity
 from .validation import validate_book as validate_book
 from .validation import validate_ftl_resource as validate_ftl_resource
+from .validation import validate_ftl_resource_schemas as validate_ftl_resource_schemas
 from .validation import validate_legislative_transaction as validate_legislative_transaction
 from .validation import validate_transaction as validate_transaction
 
@@ -86,6 +88,7 @@ __all__: list[str] = [
     "FinestVXService",
     "FinestVXServiceConfig",
     "FiscalPeriodState",
+    "FluentAmount",
     "GatewayDebugSnapshot",
     "ILegislativePack",
     "JournalTransaction",
@@ -123,6 +126,7 @@ __all__: list[str] = [
     "validate_book",
     "validate_chart_of_accounts",
     "validate_ftl_resource",
+    "validate_ftl_resource_schemas",
     "validate_legislative_transaction",
     "validate_transaction",
     "validate_transaction_balance",

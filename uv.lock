@@ -265,17 +265,8 @@ wheels = [
 ]
 
 [[package]]
-name = "execnet"
-version = "2.1.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/bf/89/780e11f9588d9e7128a3f87788354c7946a9cbb1401ad38a48c4db9a4f07/execnet-2.1.2.tar.gz", hash = "sha256:63d83bfdd9a23e35b9c6a3261412324f964c2ec8dcd8d3c6916ee9373e0befcd", size = 166622, upload-time = "2025-11-12T09:56:37.75Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ab/84/02fc1827e8cdded4aa65baef11296a9bbe595c474f0d6d758af082d849fd/execnet-2.1.2-py3-none-any.whl", hash = "sha256:67fba928dd5a544b783f6056f449e5e3931a5c378b128bc18501f7ea79e296ec", size = 40708, upload-time = "2025-11-12T09:56:36.333Z" },
-]
-
-[[package]]
 name = "finestvx"
-version = "0.6.0"
+version = "0.7.0"
 source = { editable = "." }
 dependencies = [
     { name = "apsw" },
@@ -293,8 +284,6 @@ dev = [
     { name = "pytest" },
     { name = "pytest-benchmark" },
     { name = "pytest-cov" },
-    { name = "pytest-sugar" },
-    { name = "pytest-xdist" },
     { name = "ruff" },
     { name = "types-psutil" },
 ]
@@ -305,7 +294,7 @@ release = [
 [package.metadata]
 requires-dist = [
     { name = "apsw", specifier = ">=3.51.3.0" },
-    { name = "ftllexengine", extras = ["babel"], specifier = ">=0.155.0" },
+    { name = "ftllexengine", extras = ["babel"], specifier = ">=0.156.0" },
     { name = "lxml", specifier = ">=6.0.2,<7.0.0" },
     { name = "reportlab", specifier = ">=4.4.10,<5.0.0" },
 ]
@@ -319,8 +308,6 @@ dev = [
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "pytest-benchmark", specifier = ">=5.2.3" },
     { name = "pytest-cov", specifier = ">=7.0.0" },
-    { name = "pytest-sugar", specifier = ">=1.1.1" },
-    { name = "pytest-xdist", specifier = ">=3.8.0" },
     { name = "ruff", specifier = ">=0.15.6" },
     { name = "types-psutil", specifier = ">=7.2.2.20260130" },
 ]
@@ -328,11 +315,11 @@ release = [{ name = "twine", specifier = ">=6.2.0" }]
 
 [[package]]
 name = "ftllexengine"
-version = "0.155.0"
+version = "0.156.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/25/8d/3aedcb25f322fefeb28470949f40be1fe2642298c1f7bb8c3e99bfb6131a/ftllexengine-0.155.0.tar.gz", hash = "sha256:fb52f7edefc751911ab56e6070f6d786702f0f2fe11183d20669fbd1fff15cd2", size = 1443156, upload-time = "2026-03-16T04:41:44.763Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/95/84/4a83b733f5f6df9abea2aefacb37bf41fb24037ab5be0297ddfb5a100269/ftllexengine-0.156.0.tar.gz", hash = "sha256:2a4c17c9b6b3a079cc9099d63207fb425b78b8dbeaca628168a16cefcca2fc54", size = 1466306, upload-time = "2026-03-17T10:10:46.063Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5f/d9/e653b3372c3f857a323d8c672e1d736c0118b462d3655d8459bf3cd8b364/ftllexengine-0.155.0-py3-none-any.whl", hash = "sha256:0569986f3428e713ebc57ce81364bb6dd20e0851146fd205e2ec410cc2782805", size = 355749, upload-time = "2026-03-16T04:41:43.345Z" },
+    { url = "https://files.pythonhosted.org/packages/c6/65/13dd4189a279576872617c16f89dca312b0b1b3c1788577ca985632dd87d/ftllexengine-0.156.0-py3-none-any.whl", hash = "sha256:5688f21d4797a2d4e85b1b1c0147c2552c939e3e10ff4acd26bd9fa280873f96", size = 363495, upload-time = "2026-03-17T10:10:44.123Z" },
 ]
 
 [package.optional-dependencies]
@@ -908,32 +895,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pytest-sugar"
-version = "1.1.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "pytest" },
-    { name = "termcolor" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/0b/4e/60fed105549297ba1a700e1ea7b828044842ea27d72c898990510b79b0e2/pytest-sugar-1.1.1.tar.gz", hash = "sha256:73b8b65163ebf10f9f671efab9eed3d56f20d2ca68bda83fa64740a92c08f65d", size = 16533, upload-time = "2025-08-23T12:19:35.737Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/87/d5/81d38a91c1fdafb6711f053f5a9b92ff788013b19821257c2c38c1e132df/pytest_sugar-1.1.1-py3-none-any.whl", hash = "sha256:2f8319b907548d5b9d03a171515c1d43d2e38e32bd8182a1781eb20b43344cc8", size = 11440, upload-time = "2025-08-23T12:19:34.894Z" },
-]
-
-[[package]]
-name = "pytest-xdist"
-version = "3.8.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "execnet" },
-    { name = "pytest" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/78/b4/439b179d1ff526791eb921115fca8e44e596a13efeda518b9d845a619450/pytest_xdist-3.8.0.tar.gz", hash = "sha256:7e578125ec9bc6050861aa93f2d59f1d8d085595d6551c2c90b6f4fad8d3a9f1", size = 88069, upload-time = "2025-07-01T13:30:59.346Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ca/31/d4e37e9e550c2b92a9cbc2e4d0b7420a27224968580b5a447f420847c975/pytest_xdist-3.8.0-py3-none-any.whl", hash = "sha256:202ca578cfeb7370784a8c33d6d05bc6e13b4f25b5053c30a152269fd10f0b88", size = 46396, upload-time = "2025-07-01T13:30:56.632Z" },
-]
-
-[[package]]
 name = "pytokens"
 version = "0.4.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1129,15 +1090,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c4/68/79977123bb7be889ad680d79a40f339082c1978b5cfcf62c2d8d196873ac/starlette-0.52.1.tar.gz", hash = "sha256:834edd1b0a23167694292e94f597773bc3f89f362be6effee198165a35d62933", size = 2653702, upload-time = "2026-01-18T13:34:11.062Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/81/0d/13d1d239a25cbfb19e740db83143e95c772a1fe10202dda4b76792b114dd/starlette-0.52.1-py3-none-any.whl", hash = "sha256:0029d43eb3d273bc4f83a08720b4912ea4b071087a3b48db01b7c839f7954d74", size = 74272, upload-time = "2026-01-18T13:34:09.188Z" },
-]
-
-[[package]]
-name = "termcolor"
-version = "3.3.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/46/79/cf31d7a93a8fdc6aa0fbb665be84426a8c5a557d9240b6239e9e11e35fc5/termcolor-3.3.0.tar.gz", hash = "sha256:348871ca648ec6a9a983a13ab626c0acce02f515b9e1983332b17af7979521c5", size = 14434, upload-time = "2025-12-29T12:55:21.882Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/33/d1/8bb87d21e9aeb323cc03034f5eaf2c8f69841e40e4853c2627edf8111ed3/termcolor-3.3.0-py3-none-any.whl", hash = "sha256:cf642efadaf0a8ebbbf4bc7a31cec2f9b5f21a9f726f4ccbb08192c9c26f43a5", size = 7734, upload-time = "2025-12-29T12:55:20.718Z" },
 ]
 
 [[package]]

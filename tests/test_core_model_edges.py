@@ -9,6 +9,7 @@ from typing import Any, cast
 import pytest
 from ftllexengine import FiscalCalendar, FiscalPeriod, FluentNumber, make_fluent_number
 
+import finestvx.core._validators as validators_module
 import finestvx.core.models as models_module
 from finestvx.core import Account, Book, BookPeriod, JournalTransaction, LedgerEntry, PostingSide
 from finestvx.core.enums import TransactionState
@@ -22,11 +23,11 @@ class TestCoreModelHelpers:
     def test_text_ratio_and_tuple_helpers_reject_invalid_values(self) -> None:
         """Primitive validators reject invalid scalar inputs with clear errors."""
         with pytest.raises(TypeError, match="field must be str"):
-            models_module._require_non_empty_text(1, "field")
+            validators_module.require_non_empty_text(1, "field")
         with pytest.raises(ValueError, match="field must not be empty"):
-            models_module._require_non_empty_text("   ", "field")
-        assert models_module._normalize_optional_text(None, "field") is None
-        assert models_module._normalize_optional_text(" value ", "field") == "value"
+            validators_module.require_non_empty_text("   ", "field")
+        assert validators_module.normalize_optional_text(None, "field") is None
+        assert validators_module.normalize_optional_text(" value ", "field") == "value"
 
         with pytest.raises(TypeError, match="tax_rate must be Decimal, not bool"):
             models_module._require_decimal_ratio(True, "tax_rate")
@@ -36,7 +37,7 @@ class TestCoreModelHelpers:
             models_module._require_decimal_ratio(Decimal("NaN"), "tax_rate")
 
         assert models_module._coerce_tuple([1, 2], "items") == (1, 2)
-        with pytest.raises(TypeError, match="items must be tuple or list"):
+        with pytest.raises(TypeError, match="items must be a sequence"):
             models_module._coerce_tuple({1, 2}, "items")
 
     def test_amount_and_enum_helpers_reject_invalid_values(self) -> None:
@@ -182,6 +183,7 @@ class TestCoreModelHelpers:
             name="Demo Book",
             base_currency="EUR",
             fiscal_calendar=FiscalCalendar(start_month=1),
+            legislative_pack="lv.standard.2026",
             accounts=(cash, revenue),
             periods=(valid_period, later_period),
         )
@@ -274,7 +276,7 @@ class TestCoreModelConstructors:
                 currency="EUR",
             )
 
-        with pytest.raises(TypeError, match="entries must be tuple or list"):
+        with pytest.raises(TypeError, match="entries must be a sequence"):
             JournalTransaction(
                 reference="TX-2026-1000",
                 posted_at=_POSTED_AT,
@@ -333,6 +335,7 @@ class TestCoreModelConstructors:
                 name="Demo Book",
                 base_currency="EUR",
                 fiscal_calendar=FiscalCalendar(start_month=1),
+                legislative_pack="lv.standard.2026",
                 accounts=(),
                 transactions=cast("Any", (object(),)),
             )

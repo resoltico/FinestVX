@@ -1,8 +1,8 @@
 ---
 afad: "3.3"
-version: "0.5.0"
+version: "0.7.0"
 domain: PRIMARY
-updated: "2026-03-15"
+updated: "2026-03-17"
 route:
   keywords: [architecture layers, apsw runtime, reader pool, writer thread, lifecycle lock, subinterpreters, python 3.14, observability]
   questions: ["what architecture is implemented today?", "how does concurrency work now?", "where are the python 3.14 features used?", "how do reads and writes interact?", "what observability surfaces exist?"]
@@ -70,7 +70,7 @@ FinestVX implements single-writer mutation flow with WAL-concurrent reads.
 - `finestvx.persistence.sql` renders validated SQL from template strings.
 
 ### PEP 734
-- `LegislativeInterpreterRunner` executes pack validation inside fresh subinterpreters.
+- `LegislativeInterpreterRunner` executes pack validation inside a reusable `InterpreterPool` of PEP 734 subinterpreters; interpreters are pre-warmed and reused across calls to amortize startup cost.
 
 ### PEP 784
 - database snapshots use `compression.zstd` for WAL-consistent compressed backups.

@@ -12,6 +12,11 @@ jobs:
   build:
     name: Build & Verify Quality (Python 3.14)
     runs-on: ubuntu-latest
+    # Force all uv commands (sync, run, etc.) to use the same versioned venv as the
+    # scripts. Without this, bare "uv sync" creates the default ".venv" while the
+    # scripts pivot to ".venv-3.14", wasting ~150 MiB on a duplicate environment.
+    env:
+      UV_PROJECT_ENVIRONMENT: .venv-3.14
     steps:
       - uses: actions/checkout@v4
 
@@ -85,7 +90,7 @@ jobs:
 
           PACKAGE="${{ steps.detect.outputs.name }}"
 
-          RUNTIME_VERSION=$(python -c "import ${PACKAGE}; print(${PACKAGE}.__version__)")
+          RUNTIME_VERSION=$(uv run python -c "import ${PACKAGE}; print(${PACKAGE}.__version__)")
           TAG_VERSION="${GITHUB_REF#refs/tags/}"
           TAG_VERSION="${TAG_VERSION#v}"
 

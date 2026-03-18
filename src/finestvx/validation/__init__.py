@@ -4,6 +4,7 @@ from .reports import ValidationFinding, ValidationReport, ValidationSeverity
 from .service import (
     validate_book,
     validate_ftl_resource,
+    validate_ftl_resource_schemas,
     validate_legislative_transaction,
     validate_transaction,
 )
@@ -14,6 +15,7 @@ __all__ = [
     "ValidationSeverity",
     "validate_book",
     "validate_ftl_resource",
+    "validate_ftl_resource_schemas",
     "validate_legislative_transaction",
     "validate_transaction",
 ]

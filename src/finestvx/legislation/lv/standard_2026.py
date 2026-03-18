@@ -29,6 +29,23 @@ __all__ = ["LatviaStandard2026Pack"]
 _STANDARD_VAT_RATE = Decimal("0.21")
 _EUR_QUANTIZE = Decimal("0.01")
 
+# Message IDs declared by the Latvia 2026 FTL resources.
+# These must be present in at least one locale after boot; the boot sequence
+# raises IntegrityCheckFailedError if any are absent from the full fallback chain.
+_REQUIRED_MESSAGES: frozenset[str] = frozenset({
+    "latvia-pack-name",
+    "vat-standard-rate",
+    "vat-amount",
+})
+
+# Variable schema contracts: message_id -> expected variable names.
+# boot() validates that every locale resource declares exactly these variables
+# for each message, raising IntegrityCheckFailedError on any mismatch.
+_MESSAGE_SCHEMAS: dict[str, frozenset[str]] = {
+    "vat-standard-rate": frozenset({"rate"}),
+    "vat-amount": frozenset({"amount"}),
+}
+
 
 @fluent_function
 def round_eur(value: FluentNumber) -> FluentNumber:
@@ -71,23 +88,43 @@ class LatviaStandard2026Pack:
     metadata: LegislativePackMetadata = field(default_factory=_build_metadata)
     function_registry: FunctionRegistry = field(default_factory=_build_registry)
 
-    def create_localization(self) -> FluentLocalization:
-        """Create the strict pack-local localization runtime."""
+    def localization_boot_config(self) -> LocalizationBootConfig:
+        """Return the strict boot configuration for the Latvia 2026 localization runtime.
+
+        The returned config declares:
+        - All FTL resource IDs shipped with the pack.
+        - required_messages: every message ID that must be present in at least
+          one locale (boot raises IntegrityCheckFailedError if any are absent).
+        - message_schemas: variable contracts for every parameterized message
+          (boot raises IntegrityCheckFailedError on any variable mismatch).
+        - strict=True: hard-fail on any resource load error.
+        - The mandated financial-grade cache configuration.
+
+        Returns:
+            A ``LocalizationBootConfig`` ready to call ``.boot()`` or
+            ``.boot_simple()``.
+        """
         base_path = Path(__file__).with_name("locales") / "{locale}"
-        localization = LocalizationBootConfig.from_path(
+        return LocalizationBootConfig.from_path(
             locales=(self.metadata.default_locale, "en_us"),
             resource_ids=("legislation.ftl",),
             base_path=base_path,
+            required_messages=_REQUIRED_MESSAGES,
+            message_schemas=_MESSAGE_SCHEMAS,
             cache=MANDATED_CACHE_CONFIG,
-        ).boot()
-        shared_registry = get_shared_registry()
-        for function_name in self.function_registry:
-            if shared_registry.has_function(function_name):
-                continue
-            function = self.function_registry.get_callable(function_name)
-            if function is not None:
-                localization.add_function(function_name, function)
-        return localization
+        )
+
+    def configure_localization(self, l10n: FluentLocalization) -> None:
+        """Register pack-specific custom functions into an already-booted localization.
+
+        Iterates the pack's function registry and registers every entry into the
+        localization. Calls are idempotent — re-registering an already-present
+        function is a no-op.
+        """
+        for ftl_name in self.function_registry.list_functions():
+            func = self.function_registry.get_callable(ftl_name)
+            if func is not None:
+                l10n.add_function(ftl_name, func)
 
     def validate_transaction(
         self,

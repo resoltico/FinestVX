@@ -1,8 +1,8 @@
 ---
 afad: "3.3"
-version: "0.5.0"
+version: "0.7.0"
 domain: CORE
-updated: "2026-03-15"
+updated: "2026-03-17"
 route:
   keywords: [book aggregate, journal transaction, ledger entry, chart of accounts, balance validation, immutable ledger, currency precision]
   questions: ["how is a book modeled?", "what invariants does a journal transaction enforce?", "how are ledger entries represented?", "how do i validate a chart of accounts?", "what is the current FinestVX core API?"]
@@ -98,7 +98,7 @@ class JournalTransaction:
     reference: TransactionReference
     posted_at: datetime
     description: str
-    entries: tuple[LedgerEntry, ...] | list[LedgerEntry]
+    entries: Sequence[LedgerEntry]
     period: FiscalPeriod | None = None
     state: TransactionState = TransactionState.POSTED
     reversal_of: TransactionReference | None = None
@@ -128,14 +128,15 @@ class Book:
     name: str
     base_currency: CurrencyCode
     fiscal_calendar: FiscalCalendar = field(default_factory=FiscalCalendar)
-    legislative_pack: LegislativePackCode = "lv.standard.2026"
-    accounts: tuple[Account, ...] | list[Account] = ()
-    periods: tuple[BookPeriod, ...] | list[BookPeriod] = ()
-    transactions: tuple[JournalTransaction, ...] | list[JournalTransaction] = ()
+    legislative_pack: LegislativePackCode = ""
+    accounts: Sequence[Account] = ()
+    periods: Sequence[BookPeriod] = ()
+    transactions: Sequence[JournalTransaction] = ()
 ```
 
 ### Constraints
 - `base_currency` must be a valid ISO 4217 code.
+- `legislative_pack` has an empty-string syntactic default that is always rejected at `__post_init__`; callers must supply a non-empty value.
 - `fiscal_calendar` must be `ftllexengine.FiscalCalendar`.
 - `accounts`, `periods`, and `transactions` are normalized to tuples.
 - Account codes must be unique.
@@ -165,7 +166,7 @@ def validate_chart_of_accounts(accounts: Sequence[Account]) -> None:
 - Rejects non-`Account` members.
 - Rejects duplicate account codes.
 - Rejects missing parent references.
-- Rejects account cycles using `ftllexengine.analysis.detect_cycles()`.
+- Rejects account cycles using an internal O(V) ancestor-walk.
 - Returns `None` on success and raises `TypeError` or `ValueError` on failure.
 
 ---

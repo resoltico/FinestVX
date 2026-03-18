@@ -30,7 +30,7 @@ class TestFinestVXService:
             audit_context=AuditContext(actor="tester", reason="post"),
         )
         artifact = service.export_book(book.code, "json")
-        localization = service.get_pack_localization(book.legislative_pack)
+        localization, _summary = service.get_pack_localization(book.legislative_pack)
         text, errors = localization.format_value("latvia-pack-name")
 
         assert artifact.media_type == "application/json"

@@ -1,8 +1,8 @@
 ---
 afad: "3.3"
-version: "0.5.0"
+version: "0.7.0"
 domain: SECONDARY
-updated: "2026-03-15"
+updated: "2026-03-17"
 route:
   keywords: [persistence, apsw, sqlite wal, reader pool, async reader, changeset, patchset, reserve bytes, store debug snapshot, wal hook]
   questions: ["how does finestvx persistence work now?", "what does SqliteLedgerStore return on writes?", "how are APSW readers configured?", "what telemetry does the store expose?", "how do async reads work?", "how are reserve bytes enforced?"]
@@ -368,6 +368,9 @@ class SqliteLedgerStore:
 - Write methods return `StoreWriteReceipt`; the raw `execute()` escape hatch does not exist.
 - `create_snapshot()` runs on the writer connection after WAL checkpoint truncation.
 - `load_book()` raises `KeyError` for unknown `book_code`.
+- `load_book()` raises `LedgerInvariantError` (`ftllexengine.integrity`) when a loaded book fails an accounting invariant (unbalanced posted transaction, duplicate account code); indicates storage corruption or a write-path bug.
+- `load_book()` raises `PersistenceIntegrityError` (`ftllexengine.integrity`) when deserialization produces a value that cannot satisfy domain model invariants (unknown currency code, precision violation); indicates schema migration gap or storage tampering.
+- Both integrity exceptions carry `IntegrityContext` for structured audit trail correlation.
 - Direct reads can run concurrently with writes; writer operations remain serialized by the internal writer lock.
 
 ---

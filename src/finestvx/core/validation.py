@@ -54,5 +54,12 @@ def account_dependency_map(accounts: Sequence[Account]) -> dict[AccountCode, set
 
 
 def detect_account_cycles(accounts: Sequence[Account]) -> list[list[str]]:
-    """Return account-cycle paths without raising on failure."""
+    """Return account-cycle paths without raising on failure.
+
+    This is the diagnostic/public API: it returns cycle paths for callers to
+    inspect or report, and never raises.  A separate private enforcement path
+    (``_find_account_cycle`` in ``core/models.py``) raises ``ValueError``
+    immediately when a cycle is detected during ``Book.__post_init__``.  Both
+    implementations are intentional: enforcement raises, diagnostics return.
+    """
     return detect_cycles(account_dependency_map(accounts))

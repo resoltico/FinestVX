@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from ftllexengine import parse_ftl
 from ftllexengine.diagnostics import WarningSeverity
+from ftllexengine.introspection import validate_message_variables
+from ftllexengine.syntax.ast import Message, Term
 from ftllexengine.validation import validate_resource
 
 from finestvx.core.validation import validate_chart_of_accounts, validate_transaction_balance
@@ -22,6 +25,7 @@ __all__ = [
     "report_from_legislative_result",
     "validate_book",
     "validate_ftl_resource",
+    "validate_ftl_resource_schemas",
     "validate_legislative_transaction",
     "validate_transaction",
 ]
@@ -154,6 +158,74 @@ def validate_ftl_resource(
             for annotation in result.annotations
         ]
     )
+    return ValidationReport(tuple(findings))
+
+
+def validate_ftl_resource_schemas(
+    source: str,
+    expected_schemas: Mapping[str, frozenset[str]],
+) -> ValidationReport:
+    """Validate FTL message variable contracts against expected schemas.
+
+    Parses ``source`` and verifies that every message or term listed in
+    ``expected_schemas`` declares exactly the expected variable set — no missing
+    variables, no extra variables.  This is the pre-flight check that ensures
+    all legislative pack FTL resources honour the variable contracts declared in
+    the pack's ``localization_boot_config()``.
+
+    Args:
+        source: FTL source text to validate.
+        expected_schemas: Mapping of message or term ID to expected variable
+            names.  Example: ``{"vat-amount": frozenset({"amount"})}``.
+
+    Returns:
+        A :class:`ValidationReport` containing an ``FTL_SCHEMA_MISMATCH`` error
+        finding for every message whose declared variables deviate from the
+        expected set, or an empty report when all contracts are satisfied.
+    """
+    resource = parse_ftl(source)
+    entries_by_id: dict[str, Message | Term] = {
+        entry.id.name: entry
+        for entry in resource.entries
+        if isinstance(entry, (Message, Term))
+    }
+    findings: list[ValidationFinding] = []
+    for message_id, expected_vars in expected_schemas.items():
+        entry = entries_by_id.get(message_id)
+        if entry is None:
+            findings.append(
+                ValidationFinding(
+                    code="FTL_SCHEMA_MESSAGE_MISSING",
+                    message=f"Message {message_id!r} not found in FTL source",
+                    severity=ValidationSeverity.ERROR,
+                    source="ftl.schema",
+                )
+            )
+            continue
+        result = validate_message_variables(entry, expected_vars)
+        if not result.is_valid:
+            findings.append(
+                ValidationFinding(
+                    code="FTL_SCHEMA_MISMATCH",
+                    message=(
+                        f"Message {message_id!r}: expected vars "
+                        f"{sorted(expected_vars)}, "
+                        f"got {sorted(result.declared_variables)}"
+                        + (
+                            f" (missing: {sorted(result.missing_variables)})"
+                            if result.missing_variables
+                            else ""
+                        )
+                        + (
+                            f" (extra: {sorted(result.extra_variables)})"
+                            if result.extra_variables
+                            else ""
+                        )
+                    ),
+                    severity=ValidationSeverity.ERROR,
+                    source="ftl.schema",
+                )
+            )
     return ValidationReport(tuple(findings))
 
 

@@ -1,9 +1,17 @@
-"""Headless service facade for FinestVX consumers."""
+"""Headless service facade for FinestVX consumers.
+
+All monetary input strings received from external sources (user input, CSV uploads,
+ERP integrations) MUST be parsed via ``ftllexengine.parsing.numbers.parse_decimal(value,
+locale)`` before being converted to ``FluentNumber``.  Never call ``Decimal(str(user_input))``
+directly — this bypasses locale grouping-separator validation and the built-in DoS guard.
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal
+
+import ftllexengine
 
 from finestvx.export import ExportArtifact, LedgerExporter
 from finestvx.legislation import (
@@ -23,7 +31,7 @@ from finestvx.validation.service import report_from_legislative_result
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from ftllexengine.localization import FluentLocalization
+    from ftllexengine.localization import FluentLocalization, LoadSummary
 
     from finestvx.core.models import Book, JournalTransaction
     from finestvx.legislation import LegislativeValidationResult
@@ -64,23 +72,31 @@ class PostedTransactionResult:
 
 @dataclass(slots=True)
 class FinestVXService:
-    """High-level orchestration facade for storage, validation, and export."""
+    """High-level orchestration facade for storage, validation, and export.
+
+    Long-running deployments should call :meth:`clear_caches` periodically
+    (e.g., daily at low-traffic time or after loading large locale batches) to
+    release accumulated FTLLexEngine module-level caches.
+    """
 
     config: FinestVXServiceConfig
     registry: LegislativePackRegistry = field(default_factory=create_default_pack_registry)
     exporter: LedgerExporter = field(default_factory=LedgerExporter)
-    interpreter_runner: LegislativeInterpreterRunner = field(
-        default_factory=LegislativeInterpreterRunner
-    )
+    interpreter_runner: LegislativeInterpreterRunner = field(init=False, repr=False)
     _runtime: LedgerRuntime = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        """Start the runtime after service construction."""
+        """Start the runtime and interpreter pool after service construction."""
         self._runtime = LedgerRuntime(self.config.runtime)
+        self.interpreter_runner = LegislativeInterpreterRunner(
+            pool_min_size=self.config.runtime.legislative_interpreter_pool_min_size,
+            pool_max_size=self.config.runtime.legislative_interpreter_pool_max_size,
+        )
 
     def close(self) -> None:
-        """Close runtime resources held by the service."""
+        """Close runtime resources and interpreter pool held by the service."""
         self._runtime.close()
+        self.interpreter_runner.close()
 
     def create_book(self, book: Book, *, audit_context: AuditContext) -> StoreWriteReceipt:
         """Persist a new book."""
@@ -171,10 +187,45 @@ class FinestVXService:
         """Create a database snapshot from the underlying runtime store."""
         return self._runtime.create_snapshot(output_path, compress=compress)
 
-    def get_pack_localization(self, pack_code: str) -> FluentLocalization:
-        """Create the strict localization runtime for a registered pack."""
+    def get_pack_localization(self, pack_code: str) -> tuple[FluentLocalization, LoadSummary]:
+        """Boot the strict localization runtime for a registered pack.
+
+        Executes the full boot sequence: loads all FTL resources, verifies all
+        required messages are present, validates all message variable schemas,
+        and returns structured boot evidence for the audit trail.
+
+        Args:
+            pack_code: Legislative pack code identifying the pack.
+
+        Returns:
+            A two-tuple of ``(FluentLocalization, LoadSummary)``.  The
+            ``LoadSummary`` must be written to the audit log by the caller.
+
+        Raises:
+            ftllexengine.integrity.IntegrityCheckFailedError: If any resource
+                fails to load, a required message is absent, or a variable
+                schema mismatches.
+        """
         pack = self.registry.resolve(pack_code)
-        return pack.create_localization()
+        config = pack.localization_boot_config()
+        l10n, summary, _schema_results = config.boot()
+        pack.configure_localization(l10n)
+        return l10n, summary
+
+    def clear_caches(self, components: frozenset[str] | None = None) -> None:
+        """Clear FTLLexEngine module-level caches.
+
+        Call periodically in long-running deployments (e.g., daily at low-traffic
+        time) or after loading a large batch of new locale data.
+
+        Args:
+            components: Optional filter selecting which cache families to clear.
+                ``None`` clears all caches.  Known components:
+                ``'parsing.currency'``, ``'parsing.dates'``, ``'locale'``,
+                ``'runtime.locale_context'``, ``'introspection.message'``,
+                ``'introspection.iso'``.
+        """
+        ftllexengine.clear_module_caches(components)
 
     def debug_snapshot(self) -> GatewayDebugSnapshot:
         """Return a non-invasive snapshot for service-level introspection."""

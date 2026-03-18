@@ -1,11 +1,11 @@
 ---
 afad: "3.3"
-version: "0.5.0"
+version: "0.7.0"
 domain: TYPES
-updated: "2026-03-15"
+updated: "2026-03-17"
 route:
-  keywords: [posting side, transaction state, fiscal period state, account code, book code, legislative pack code, transaction reference, fluent amount, type aliases]
-  questions: ["what enums does finestvx define?", "what type aliases exist in the accounting core?", "how are posting directions represented?", "what lifecycle states exist for transactions?", "what lifecycle states exist for fiscal periods?"]
+  keywords: [posting side, transaction state, fiscal period state, account code, book code, legislative pack code, transaction reference, fluent amount, type aliases, fluent number alias]
+  questions: ["what enums does finestvx define?", "what type aliases exist in the accounting core?", "how are posting directions represented?", "what lifecycle states exist for transactions?", "what lifecycle states exist for fiscal periods?", "what is FluentAmount?"]
 ---
 
 # FinestVX Types Reference
@@ -130,7 +130,7 @@ type LegislativePackCode = str
 
 ### Constraints
 - Purpose: identifies which legislative pack governs a book.
-- Default value in `Book`: `"lv.standard.2026"`.
+- `Book` has an empty-string syntactic default that `__post_init__` always rejects; callers must supply a non-empty value.
 - Narrowing: validated as non-empty at domain and registry boundaries.
 
 ---
@@ -147,3 +147,19 @@ type TransactionReference = str
 ### Constraints
 - Purpose: external or internal transaction identifier; referenced by `reversal_of`.
 - Narrowing: validated as non-empty; self-referential `reversal_of` is rejected by `JournalTransaction`.
+
+---
+
+## `FluentAmount`
+
+Type alias for monetary amounts throughout the FinestVX accounting domain.
+
+### Definition
+```python
+type FluentAmount = FluentNumber
+```
+
+### Constraints
+- `FluentAmount` is an alias for `ftllexengine.FluentNumber`; the two names are interchangeable at the type level.
+- Exported from `finestvx.core` and `finestvx` for use in type annotations that should clearly signal financial-amount semantics rather than generic `FluentNumber` usage.
+- Underlying value must be backed by `int | Decimal`; `float` and `bool` are rejected at `FluentNumber.__post_init__`.

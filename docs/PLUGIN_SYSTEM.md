@@ -1,8 +1,8 @@
 ---
 afad: "3.3"
-version: "0.5.0"
+version: "0.7.0"
 domain: AUXILIARY
-updated: "2026-03-16"
+updated: "2026-03-17"
 route:
   keywords: [plugin system, legislative pack, registry copy, subinterpreters, localization assets, extension workflow]
   questions: ["how does the finestvx plugin system work today?", "how do i add a jurisdiction pack?", "why does each pack get its own function registry copy?", "how are packs isolated at runtime?", "what does the service do after posting?"]
@@ -19,7 +19,8 @@ That means it must provide:
 - immutable metadata;
 - a pack-local `FunctionRegistry` copy;
 - `validate_transaction()`;
-- `create_localization()` backed by FTLLexEngine `LocalizationBootConfig`.
+- `localization_boot_config()` returning a `LocalizationBootConfig` with declared `required_messages` and `message_schemas`;
+- `configure_localization(l10n)` called by the gateway after boot to register custom Fluent functions via `l10n.add_function()`; packs without custom functions implement as a no-op.
 
 ## Registration Model
 
@@ -38,8 +39,8 @@ Current behavior:
 - pack-local functions cannot leak into the shared namespace.
 
 ### Interpreter Isolation
-- `LegislativeInterpreterRunner` validates packs in fresh subinterpreters;
-- `validate_transaction_isolated()` is the one-shot wrapper;
+- `LegislativeInterpreterRunner` validates packs in a reusable bounded pool of PEP 734 subinterpreters (`InterpreterPool`); interpreters are pre-warmed at construction and reused across calls;
+- `validate_transaction_isolated()` is the one-shot wrapper (creates a single-interpreter pool, validates, closes);
 - service-level post-commit legislative audit uses the isolated path.
 
 ## Latvia 2026 Pack

@@ -8,6 +8,7 @@ from decimal import Decimal
 import pytest
 from ftllexengine import FiscalCalendar, FiscalPeriod, make_fluent_number
 
+import finestvx.core._validators as validators_module
 import finestvx.core.serialization as serialization_module
 from finestvx.core import Account, Book, BookPeriod, JournalTransaction, LedgerEntry, PostingSide
 from finestvx.core.enums import FiscalPeriodState, TransactionState
@@ -109,9 +110,9 @@ class TestSerializationHelpers:
         with pytest.raises(TypeError, match="entries must be a sequence"):
             serialization_module._require_sequence("bad", "entries")
         with pytest.raises(TypeError, match="name must be str"):
-            serialization_module._require_text(1, "name")
+            validators_module.require_non_empty_text(1, "name")
         with pytest.raises(ValueError, match="name must not be empty"):
-            serialization_module._require_text("  ", "name")
+            validators_module.require_non_empty_text("  ", "name")
         with pytest.raises(TypeError, match="start_date must be ISO date text"):
             serialization_module._require_date(1, "start_date")
         with pytest.raises(TypeError, match="posted_at must be ISO datetime text"):

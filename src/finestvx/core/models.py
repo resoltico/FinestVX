@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 from decimal import Decimal
@@ -10,18 +11,16 @@ from itertools import pairwise
 from typing import TYPE_CHECKING, Final
 
 from ftllexengine import FiscalCalendar, FiscalPeriod, FluentNumber
-from ftllexengine.analysis import detect_cycles, make_cycle_key
 from ftllexengine.introspection import (
     CurrencyCode,
     get_currency_decimal_digits,
     is_valid_currency_code,
 )
 
+from ._validators import normalize_optional_text, require_non_empty_text
 from .enums import FiscalPeriodState, PostingSide, TransactionState
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
-
     from .types import AccountCode, BookCode, LegislativePackCode, TransactionReference
 
 __all__ = [
@@ -33,7 +32,6 @@ __all__ = [
 ]
 
 _ZERO: Final[Decimal] = Decimal(0)
-_DEFAULT_PACK_CODE: Final[LegislativePackCode] = "lv.standard.2026"
 
 
 def _is_known_currency_code(value: str) -> bool:
@@ -41,48 +39,9 @@ def _is_known_currency_code(value: str) -> bool:
     return bool(is_valid_currency_code(value))
 
 
-def _require_non_empty_text(value: object, field_name: str) -> str:
-    """Validate and normalize a required text field.
-
-    Args:
-        value: Candidate text value.
-        field_name: Field name for diagnostics.
-
-    Returns:
-        Stripped text value.
-
-    Raises:
-        TypeError: If the value is not a string.
-        ValueError: If the value is empty after trimming.
-    """
-    if not isinstance(value, str):
-        msg = f"{field_name} must be str, got {type(value).__name__}"
-        raise TypeError(msg)
-    normalized = value.strip()
-    if not normalized:
-        msg = f"{field_name} must not be empty"
-        raise ValueError(msg)
-    return normalized
-
-
-def _normalize_optional_text(value: object, field_name: str) -> str | None:
-    """Normalize an optional text field.
-
-    Args:
-        value: Candidate text value.
-        field_name: Field name for diagnostics.
-
-    Returns:
-        Stripped text value or ``None``.
-    """
-    if value is None:
-        return None
-    return _require_non_empty_text(value, field_name)
-
-
 def _normalize_currency(value: object, field_name: str) -> CurrencyCode:
     """Validate and normalize an ISO 4217 currency code."""
-    normalized = _require_non_empty_text(value, field_name).upper()
+    normalized = require_non_empty_text(value, field_name).upper()
     if not _is_known_currency_code(normalized):
         msg = f"{field_name} must be a valid ISO 4217 currency code, got {value!r}"
         raise ValueError(msg)
@@ -109,12 +68,12 @@ def _require_decimal_ratio(value: object, field_name: str) -> Decimal | None:
 
 
 def _coerce_tuple[T](value: object, field_name: str) -> tuple[T, ...]:
-    """Accept list or tuple input and normalize to tuple storage."""
+    """Accept any sequence input and normalize to tuple storage."""
     if isinstance(value, tuple):
         return value
-    if isinstance(value, list):
+    if isinstance(value, (list, Sequence)) and not isinstance(value, str):
         return tuple(value)
-    msg = f"{field_name} must be tuple or list, got {type(value).__name__}"
+    msg = f"{field_name} must be a sequence, got {type(value).__name__}"
     raise TypeError(msg)
 
 
@@ -182,10 +141,42 @@ def _require_fiscal_calendar(value: object, field_name: str) -> FiscalCalendar:
     return value
 
 
+def _find_account_cycle(
+    code: AccountCode,
+    parent_map: dict[AccountCode, AccountCode | None],
+) -> list[AccountCode] | None:
+    """Walk the ancestor chain and return the cycle path or ``None``.
+
+    The account hierarchy is a tree: each account has at most one parent.
+    An O(V) ancestor walk is sufficient — general DFS graph algorithms are
+    not needed and would import FTL-specific constants tuned for message
+    dependency graphs, not chart-of-accounts sizes.
+
+    Args:
+        code: Starting account code.
+        parent_map: Maps each account code to its parent code or None.
+
+    Returns:
+        The cycle path (starting at the repeated node) when a cycle exists,
+        or None when the chain terminates cleanly at a root account.
+    """
+    path: list[AccountCode] = []
+    seen: set[AccountCode] = set()
+    current: AccountCode | None = code
+    while current is not None:
+        if current in seen:
+            idx = path.index(current)
+            return [*path[idx:], current]
+        seen.add(current)
+        path.append(current)
+        current = parent_map.get(current)
+    return None
+
+
 def _validate_account_collection(accounts: Sequence[object]) -> None:
     """Validate chart-of-accounts identity and topology constraints."""
     seen_codes: set[AccountCode] = set()
-    dependency_map: dict[AccountCode, set[str]] = {}
+    parent_map: dict[AccountCode, AccountCode | None] = {}
     validated_accounts: list[Account] = []
 
     for account in accounts:
@@ -197,7 +188,7 @@ def _validate_account_collection(accounts: Sequence[object]) -> None:
             msg = f"Duplicate account code detected: {account.code}"
             raise ValueError(msg)
         seen_codes.add(account.code)
-        dependency_map[account.code] = {account.parent_code} if account.parent_code else set()
+        parent_map[account.code] = account.parent_code
 
     for account in validated_accounts:
         if account.parent_code is not None and account.parent_code not in seen_codes:
@@ -207,10 +198,12 @@ def _validate_account_collection(accounts: Sequence[object]) -> None:
             )
             raise ValueError(msg)
 
-    cycles = detect_cycles(dependency_map)
-    if cycles:
-        msg = f"Chart of accounts contains cycle: {make_cycle_key(cycles[0])}"
-        raise ValueError(msg)
+    for code in seen_codes:
+        cycle = _find_account_cycle(code, parent_map)
+        if cycle is not None:
+            cycle_str = " -> ".join(cycle)
+            msg = f"Chart of accounts contains cycle: {cycle_str}"
+            raise ValueError(msg)
 
 
 def _validate_period_collection(periods: Sequence[object]) -> None:
@@ -322,13 +315,13 @@ class Account:
 
     def __post_init__(self) -> None:
         """Validate and normalize account fields."""
-        object.__setattr__(self, "code", _require_non_empty_text(self.code, "code"))
-        object.__setattr__(self, "name", _require_non_empty_text(self.name, "name"))
+        object.__setattr__(self, "code", require_non_empty_text(self.code, "code"))
+        object.__setattr__(self, "name", require_non_empty_text(self.name, "name"))
         object.__setattr__(self, "currency", _normalize_currency(self.currency, "currency"))
         object.__setattr__(
             self,
             "parent_code",
-            _normalize_optional_text(self.parent_code, "parent_code"),
+            normalize_optional_text(self.parent_code, "parent_code"),
         )
         object.__setattr__(
             self,
@@ -380,7 +373,7 @@ class LedgerEntry:
         object.__setattr__(
             self,
             "account_code",
-            _require_non_empty_text(self.account_code, "account_code"),
+            require_non_empty_text(self.account_code, "account_code"),
         )
         object.__setattr__(self, "side", _require_posting_side(self.side, "side"))
         object.__setattr__(self, "amount", _require_fluent_number(self.amount, "amount"))
@@ -406,7 +399,7 @@ class LedgerEntry:
         object.__setattr__(
             self,
             "description",
-            _normalize_optional_text(self.description, "description"),
+            normalize_optional_text(self.description, "description"),
         )
         object.__setattr__(self, "tax_rate", _require_decimal_ratio(self.tax_rate, "tax_rate"))
 
@@ -423,17 +416,22 @@ class JournalTransaction:
     reference: TransactionReference
     posted_at: datetime
     description: str
-    entries: tuple[LedgerEntry, ...] | list[LedgerEntry]
+    entries: Sequence[LedgerEntry]
     period: FiscalPeriod | None = None
     state: TransactionState = TransactionState.POSTED
     reversal_of: TransactionReference | None = None
 
     def __post_init__(self) -> None:
-        """Validate transaction identity and balancing constraints."""
+        """Validate transaction identity and balancing constraints.
+
+        The entries field accepts any Sequence[LedgerEntry] at construction
+        and is normalized to tuple[LedgerEntry, ...] by _coerce_tuple.
+        After __post_init__ the field always holds an immutable tuple.
+        """
         object.__setattr__(
             self,
             "reference",
-            _require_non_empty_text(self.reference, "reference"),
+            require_non_empty_text(self.reference, "reference"),
         )
         object.__setattr__(
             self,
@@ -443,7 +441,7 @@ class JournalTransaction:
         object.__setattr__(
             self,
             "description",
-            _require_non_empty_text(self.description, "description"),
+            require_non_empty_text(self.description, "description"),
         )
         object.__setattr__(self, "entries", _coerce_tuple(self.entries, "entries"))
         if self.period is not None:
@@ -452,7 +450,7 @@ class JournalTransaction:
         object.__setattr__(
             self,
             "reversal_of",
-            _normalize_optional_text(self.reversal_of, "reversal_of"),
+            normalize_optional_text(self.reversal_of, "reversal_of"),
         )
         if self.reversal_of == self.reference:
             msg = "reversal_of must reference a different transaction"
@@ -491,21 +489,27 @@ class JournalTransaction:
 
 @dataclass(frozen=True, slots=True)
 class Book:
-    """Root aggregate containing accounts, periods, and posted transactions."""
+    """Root aggregate containing accounts, periods, and posted transactions.
+
+    All sequence fields (accounts, periods, transactions) accept any
+    Sequence at construction and are normalized to immutable tuples by
+    __post_init__. legislative_pack is required — FinestVX is
+    country-agnostic and enforces no default jurisdiction.
+    """
 
     code: BookCode
     name: str
     base_currency: CurrencyCode
     fiscal_calendar: FiscalCalendar = field(default_factory=FiscalCalendar)
-    legislative_pack: LegislativePackCode = _DEFAULT_PACK_CODE
-    accounts: tuple[Account, ...] | list[Account] = ()
-    periods: tuple[BookPeriod, ...] | list[BookPeriod] = ()
-    transactions: tuple[JournalTransaction, ...] | list[JournalTransaction] = ()
+    legislative_pack: LegislativePackCode = ""
+    accounts: Sequence[Account] = ()
+    periods: Sequence[BookPeriod] = ()
+    transactions: Sequence[JournalTransaction] = ()
 
     def __post_init__(self) -> None:
         """Validate and normalize aggregate invariants."""
-        object.__setattr__(self, "code", _require_non_empty_text(self.code, "code"))
-        object.__setattr__(self, "name", _require_non_empty_text(self.name, "name"))
+        object.__setattr__(self, "code", require_non_empty_text(self.code, "code"))
+        object.__setattr__(self, "name", require_non_empty_text(self.name, "name"))
         object.__setattr__(
             self,
             "base_currency",
@@ -519,7 +523,7 @@ class Book:
         object.__setattr__(
             self,
             "legislative_pack",
-            _require_non_empty_text(self.legislative_pack, "legislative_pack"),
+            require_non_empty_text(self.legislative_pack, "legislative_pack"),
         )
         object.__setattr__(self, "accounts", _coerce_tuple(self.accounts, "accounts"))
         object.__setattr__(self, "periods", _coerce_tuple(self.periods, "periods"))

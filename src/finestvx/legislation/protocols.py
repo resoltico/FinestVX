@@ -8,9 +8,11 @@ from typing import TYPE_CHECKING, Protocol
 from ftllexengine.core.locale_utils import require_locale_code
 from ftllexengine.introspection import is_valid_currency_code, is_valid_territory_code
 
+from finestvx.core._validators import require_non_empty_text
+
 if TYPE_CHECKING:
     from ftllexengine.introspection import CurrencyCode, TerritoryCode
-    from ftllexengine.localization import FluentLocalization
+    from ftllexengine.localization import FluentLocalization, LocalizationBootConfig
     from ftllexengine.runtime import FunctionRegistry
 
     from finestvx.core.models import Book, JournalTransaction
@@ -32,18 +34,6 @@ def _is_known_territory_code(value: str) -> bool:
 def _is_known_currency_code(value: str) -> bool:
     """Return ``True`` when the string is a known ISO 4217 currency code."""
     return bool(is_valid_currency_code(value))
-
-
-def _require_non_empty_text(value: object, field_name: str) -> str:
-    """Validate and normalize required text values."""
-    if not isinstance(value, str):
-        msg = f"{field_name} must be str, got {type(value).__name__}"
-        raise TypeError(msg)
-    normalized = value.strip()
-    if not normalized:
-        msg = f"{field_name} must not be empty"
-        raise ValueError(msg)
-    return normalized
 
 
 def _require_tax_year(value: object, field_name: str) -> int:
@@ -93,9 +83,9 @@ class LegislativePackMetadata:
         object.__setattr__(
             self,
             "pack_code",
-            _require_non_empty_text(self.pack_code, "pack_code"),
+            require_non_empty_text(self.pack_code, "pack_code"),
         )
-        territory_code = _require_non_empty_text(self.territory_code, "territory_code").upper()
+        territory_code = require_non_empty_text(self.territory_code, "territory_code").upper()
         if not _is_known_territory_code(territory_code):
             msg = f"territory_code must be a valid ISO 3166-1 alpha-2 code, got {territory_code!r}"
             raise ValueError(msg)
@@ -111,7 +101,7 @@ class LegislativePackMetadata:
             msg = "currencies must not be empty"
             raise ValueError(msg)
         normalized_currencies = tuple(
-            _require_non_empty_text(currency, "currencies").upper()
+            require_non_empty_text(currency, "currencies").upper()
             for currency in self.currencies
         )
         for currency in normalized_currencies:
@@ -131,8 +121,8 @@ class LegislativeIssue:
 
     def __post_init__(self) -> None:
         """Validate issue payload structure."""
-        object.__setattr__(self, "code", _require_non_empty_text(self.code, "code"))
-        object.__setattr__(self, "message", _require_non_empty_text(self.message, "message"))
+        object.__setattr__(self, "code", require_non_empty_text(self.code, "code"))
+        object.__setattr__(self, "message", require_non_empty_text(self.message, "message"))
         if self.entry_index is None:
             return
         object.__setattr__(
@@ -154,7 +144,7 @@ class LegislativeValidationResult:
         object.__setattr__(
             self,
             "pack_code",
-            _require_non_empty_text(self.pack_code, "pack_code"),
+            require_non_empty_text(self.pack_code, "pack_code"),
         )
         object.__setattr__(self, "issues", _coerce_tuple(self.issues, "issues"))
 
@@ -190,5 +180,16 @@ class ILegislativePack(Protocol):
     ) -> LegislativeValidationResult:
         """Validate a posted transaction within the pack's legislative rules."""
 
-    def create_localization(self) -> FluentLocalization:
-        """Create the pack-local strict localization runtime."""
+    def localization_boot_config(self) -> LocalizationBootConfig:
+        """Return the strict boot configuration for the pack's localization runtime.
+
+        The caller is responsible for calling ``LocalizationBootConfig.boot()``
+        and capturing the returned ``LoadSummary`` for audit trails.
+        """
+
+    def configure_localization(self, l10n: FluentLocalization) -> None:
+        """Register pack-specific custom functions into an already-booted localization.
+
+        Called by the gateway immediately after ``localization_boot_config().boot()``.
+        Packs with no custom functions may leave this as a no-op.
+        """

@@ -1,8 +1,8 @@
 ---
 afad: "3.3"
-version: "0.5.0"
+version: "0.7.0"
 domain: TESTING
-updated: "2026-03-15"
+updated: "2026-03-17"
 route:
   keywords: [pytest, hypothesis, mypy, pylint, ruff, lint.sh, test.sh, coverage, bash 5, quality gates, conftest, hypothesis profiles]
   questions: ["how do i run finestvx tests?", "what quality tools are configured?", "do the shared scripts pass?", "what coverage threshold is enforced?", "what test categories exist now?", "what hypothesis profiles are available?"]
@@ -16,6 +16,7 @@ route:
 |:---------|:---------|:--------|
 | Unit | `tests/test_*.py` | Deterministic behavior checks for domain, persistence, localization, export, runtime, gateway, and legislation. |
 | Property | `tests/test_*_property.py` | Invariant checks using Hypothesis. Strategies emit `hypothesis.event()` for semantic fuzzer guidance. |
+| Fuzz | `tests/fuzz/test_*.py` | Intensive tests excluded from CI; carry `@pytest.mark.fuzz`; run via `./scripts/fuzz_hypofuzz.sh --deep`. State machines and high-cost generators live here exclusively. |
 | Strategy Support | `tests/strategies/` | Shared generators for property tests (factory functions; all emit `event()` calls). |
 | Test Support | `tests/support/` | Deterministic builders and fixtures. |
 
@@ -79,9 +80,10 @@ cd tests && PYTHONPATH=../src ../.venv-3.14/bin/pylint --rcfile=.pylintrc .
 | File | Responsibility |
 |:-----|:---------------|
 | `pyproject.toml` | pytest options, coverage, mypy, Ruff, production Pylint settings |
-| `tests/conftest.py` | Hypothesis profiles, fuzz skip enforcement, `[SKIP-BREAKDOWN]` reporting |
+| `tests/conftest.py` | Hypothesis profiles, fuzz skip enforcement, `[SKIP-BREAKDOWN]` reporting, crash recording hook |
 | `tests/mypy.ini` | pragmatic mypy policy for tests |
 | `tests/.pylintrc` | pragmatic Pylint policy for tests |
+| `tests/strategy_metrics.py` | `EXPECTED_EVENTS`, `STRATEGY_CATEGORIES`, `INTENDED_WEIGHTS` — runtime strategy coverage metrics consumed by `./scripts/fuzz_hypofuzz.sh --deep --metrics` |
 
 ## Test Discipline
 

@@ -1,10 +1,10 @@
 ---
 afad: "3.3"
-version: "0.5.0"
+version: "0.7.0"
 domain: SECONDARY
-updated: "2026-03-15"
+updated: "2026-03-17"
 route:
-  keywords: [export artifact, ledger exporter, runtime config, ledger runtime, posted transaction result, service facade, gateway debug snapshot, runtime debug snapshot]
+  keywords: [export artifact, ledger exporter, runtime config, ledger runtime, posted transaction result, service facade, gateway debug snapshot, runtime debug snapshot, interpreter pool, clear caches, localization boot]
   questions: ["how does LedgerRuntime work now?", "what does FinestVXService return on writes?", "what runtime debug data is available?", "how are artifacts exported?", "what is PostedTransactionResult?"]
 ---
 
@@ -66,12 +66,17 @@ class RuntimeConfig:
     write_lock_timeout: float | None = 5.0
     queue_timeout: float = 5.0
     poll_interval: float = 0.1
+    legislative_interpreter_pool_min_size: int = 2
+    legislative_interpreter_pool_max_size: int = 8
 ```
 
 ### Constraints
 - `queue_timeout` and `poll_interval` must be positive.
 - Public runtime methods acquire `RWLock.read(timeout=read_lock_timeout)` as a lifecycle gate.
 - `close()` acquires `RWLock.write(timeout=write_lock_timeout)` for exclusive shutdown.
+- `legislative_interpreter_pool_min_size` and `legislative_interpreter_pool_max_size` configure the
+  `InterpreterPool` used by `LegislativeInterpreterRunner`; both must be positive integers with
+  `min_size <= max_size`.
 
 ---
 
@@ -194,9 +199,9 @@ High-level orchestration facade for persistence, validation, legislation, and ex
 @dataclass(slots=True)
 class FinestVXService:
     config: FinestVXServiceConfig
-    registry: LegislativePackRegistry
-    exporter: LedgerExporter
-    interpreter_runner: LegislativeInterpreterRunner
+    registry: LegislativePackRegistry  # default_factory=create_default_pack_registry
+    exporter: LedgerExporter  # default_factory=LedgerExporter
+    interpreter_runner: LegislativeInterpreterRunner  # init=False; constructed from config pool-size settings
 
     def close(self) -> None: ...
     def create_book(self, book: Book, *, audit_context: AuditContext) -> StoreWriteReceipt: ...
@@ -207,7 +212,8 @@ class FinestVXService:
     def validate_transaction_isolated(self, book_code: str, transaction: JournalTransaction) -> ValidationReport: ...
     def export_book(self, book_code: str, format_name: Literal["json", "csv", "xml", "pdf"]) -> ExportArtifact: ...
     def create_snapshot(self, output_path: Path | str, *, compress: bool = True) -> DatabaseSnapshot: ...
-    def get_pack_localization(self, pack_code: str) -> FluentLocalization: ...
+    def get_pack_localization(self, pack_code: str) -> tuple[FluentLocalization, LoadSummary]: ...
+    def clear_caches(self, components: frozenset[str] | None = None) -> None: ...
     def debug_snapshot(self) -> GatewayDebugSnapshot: ...
 ```
 
@@ -217,5 +223,8 @@ class FinestVXService:
 - `validate_transaction()` combines core validation with in-process legislative validation.
 - `validate_transaction_isolated()` combines core validation with subinterpreter legislative validation.
 - `export_book()` delegates to `LedgerExporter`.
-- `get_pack_localization()` returns the pack's upstream `FluentLocalization` runtime directly.
-- `close()` must be called to release runtime resources.
+- `get_pack_localization()` boots the pack and returns `(FluentLocalization, LoadSummary)`; calls
+  `pack.configure_localization(l10n)` immediately after boot to register pack-specific custom Fluent functions.
+- `clear_caches(components=None)` forwards to `ftllexengine.clear_module_caches(components=components)`;
+  pass a `frozenset[str]` of component names (e.g., `frozenset({"introspection.iso"})`) to clear selectively.
+- `close()` must be called to release runtime and interpreter pool resources.

@@ -194,6 +194,7 @@ class TestBook:
                 code="demo",
                 name="Demo Book",
                 base_currency="EUR",
+                legislative_pack="lv.standard.2026",
                 accounts=(account, account),
             )
 
@@ -204,6 +205,7 @@ class TestBook:
                 code="demo",
                 name="Demo Book",
                 base_currency="EUR",
+                legislative_pack="lv.standard.2026",
                 accounts=(
                     Account(
                         code="1000",
@@ -249,6 +251,7 @@ class TestBook:
                 code="demo",
                 name="Demo Book",
                 base_currency="EUR",
+                legislative_pack="lv.standard.2026",
                 accounts=(
                     Account(
                         code="1000",
@@ -289,6 +292,7 @@ class TestBook:
                 name="Demo Book",
                 base_currency="EUR",
                 fiscal_calendar=FiscalCalendar(start_month=1),
+                legislative_pack="lv.standard.2026",
                 accounts=(
                     Account(
                         code="1000",
@@ -319,6 +323,7 @@ class TestBook:
             code="demo",
             name="Demo Book",
             base_currency="EUR",
+            legislative_pack="lv.standard.2026",
             accounts=(
                 Account(
                     code="1000",
@@ -387,6 +392,7 @@ class TestBook:
                 code="demo",
                 name="Demo Book",
                 base_currency="EUR",
+                legislative_pack="lv.standard.2026",
                 accounts=(
                     Account(
                         code="1000",

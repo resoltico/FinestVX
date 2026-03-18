@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from concurrent import interpreters
-from typing import TYPE_CHECKING
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, cast
+
+from ftllexengine import InterpreterPool
 
 from .protocols import LegislativeIssue, LegislativeValidationResult
 from .registry import create_default_pack_registry
@@ -31,10 +33,33 @@ def _validate_in_subinterpreter(
     )
 
 
+@dataclass(slots=True)
 class LegislativeInterpreterRunner:
-    """Execute built-in legislative pack validation inside a fresh subinterpreter."""
+    """Execute built-in legislative pack validation using a reusable interpreter pool.
 
-    __slots__ = ()
+    Pre-warms a bounded pool of PEP 734 subinterpreters to amortize interpreter
+    creation cost across the lifetime of the service. For batch legislative
+    validation, this eliminates O(n) interpreter lifecycle overhead.
+
+    Call ``close()`` when the runner is no longer needed to release all pool
+    resources. In service deployments, this is typically wired into the service
+    shutdown sequence.
+
+    Attributes:
+        pool_min_size: Minimum interpreters to pre-warm at construction time.
+        pool_max_size: Maximum total interpreters (idle + checked out).
+    """
+
+    pool_min_size: int = 2
+    pool_max_size: int = 8
+    _pool: InterpreterPool = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        """Initialize the interpreter pool."""
+        self._pool = InterpreterPool(
+            min_size=self.pool_min_size,
+            max_size=self.pool_max_size,
+        )
 
     def validate(
         self,
@@ -42,17 +67,14 @@ class LegislativeInterpreterRunner:
         book: Book,
         transaction: JournalTransaction,
     ) -> LegislativeValidationResult:
-        """Run legislative validation in an isolated interpreter."""
-        interpreter = interpreters.create()
-        try:
-            result_pack_code, raw_issues = interpreter.call(
-                _validate_in_subinterpreter,
-                pack_code,
-                book,
-                transaction,
-            )
-        finally:
-            interpreter.close()
+        """Run legislative validation in an isolated interpreter from the pool."""
+        with self._pool.acquire() as interp:
+            call_result = interp.call(_validate_in_subinterpreter, pack_code, book, transaction)
+        # interp.call() returns object; cast to the known return type of _validate_in_subinterpreter
+        result_pack_code, raw_issues = cast(
+            "tuple[str, tuple[tuple[str, str, int | None], ...]]",
+            call_result,
+        )
         return LegislativeValidationResult(
             result_pack_code,
             tuple(
@@ -61,6 +83,10 @@ class LegislativeInterpreterRunner:
             ),
         )
 
+    def close(self) -> None:
+        """Close all pool interpreters and release resources."""
+        self._pool.close()
+
 
 def validate_transaction_isolated(
     pack_code: str,
@@ -68,4 +94,8 @@ def validate_transaction_isolated(
     transaction: JournalTransaction,
 ) -> LegislativeValidationResult:
     """Convenience wrapper for one-shot isolated legislative validation."""
-    return LegislativeInterpreterRunner().validate(pack_code, book, transaction)
+    runner = LegislativeInterpreterRunner(pool_min_size=1, pool_max_size=1)
+    try:
+        return runner.validate(pack_code, book, transaction)
+    finally:
+        runner.close()

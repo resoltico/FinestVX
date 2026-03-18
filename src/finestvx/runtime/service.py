@@ -41,14 +41,25 @@ class RuntimeConfig:
     write_lock_timeout: float | None = 5.0
     queue_timeout: float = 5.0
     poll_interval: float = 0.1
+    legislative_interpreter_pool_min_size: int = 2
+    legislative_interpreter_pool_max_size: int = 8
 
     def __post_init__(self) -> None:
-        """Validate runtime timings."""
+        """Validate runtime timings and pool bounds."""
         if self.queue_timeout <= 0:
             msg = "queue_timeout must be positive"
             raise ValueError(msg)
         if self.poll_interval <= 0:
             msg = "poll_interval must be positive"
+            raise ValueError(msg)
+        if self.legislative_interpreter_pool_min_size < 1:
+            msg = "legislative_interpreter_pool_min_size must be >= 1"
+            raise ValueError(msg)
+        if self.legislative_interpreter_pool_max_size < self.legislative_interpreter_pool_min_size:
+            msg = (
+                "legislative_interpreter_pool_max_size must be >= "
+                "legislative_interpreter_pool_min_size"
+            )
             raise ValueError(msg)
 
 

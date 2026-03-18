@@ -1,8 +1,8 @@
 ---
 afad: "3.3"
-version: "0.6.0"
+version: "0.7.0"
 domain: CHANGELOG
-updated: "2026-03-16"
+updated: "2026-03-17"
 route:
   keywords: [changelog, release notes, version history, breaking changes, migration, fixed, what's new]
   questions: ["what changed in version X?", "what are the breaking changes?", "what was fixed in the latest release?", "what is the release history?"]
@@ -14,6 +14,91 @@ Notable changes to this project are documented in this file. The format is based
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.7.0] - 2026-03-18
+
+### Breaking Changes
+
+- **`ILegislativePack.create_localization()` removed** — replaced by
+  `localization_boot_config() -> LocalizationBootConfig`; callers must now execute
+  `pack.localization_boot_config().boot()` and capture the returned
+  `(FluentLocalization, LoadSummary, ...)` evidence tuple
+- **`FinestVXService.get_pack_localization()` return type changed** — now returns
+  `(FluentLocalization, LoadSummary)` instead of bare `FluentLocalization`; callers must
+  write the `LoadSummary` to the audit log
+- **`FinestVXService.interpreter_runner` no longer accepts a custom factory** — the field
+  is now `init=False` and constructed from `RuntimeConfig` pool size settings
+- **`RuntimeConfig` gains `legislative_interpreter_pool_min_size: int = 2` and
+  `legislative_interpreter_pool_max_size: int = 8`** — existing `RuntimeConfig` constructions
+  without these fields continue to work (defaults are sane); override to tune pool size
+- **`LegislativeInterpreterRunner` is now a stateful dataclass** — `close()` must be called
+  on shutdown to release interpreter pool resources; `FinestVXService.close()` handles this
+  automatically when using the service facade
+- **`Book.legislative_pack` no longer has a default value** — previously defaulted to
+  `"lv.standard.2026"` (Latvian pack); now required at construction; every `Book()` call must
+  provide an explicit `legislative_pack=` argument
+
+### Added
+
+- **`FinestVXService.clear_caches(components=None)`** — clears FTLLexEngine module-level
+  caches; accepts an optional `frozenset[str]` to clear only named component families; for
+  use in long-running deployments to reclaim locale/CLDR cache memory
+- **`validate_ftl_resource_schemas(source, expected_schemas)`** (`finestvx.validation`) —
+  validates FTL message variable contracts against declared expected variable sets; returns a
+  `ValidationReport` with `FTL_SCHEMA_MISMATCH` or `FTL_SCHEMA_MESSAGE_MISSING` findings;
+  exported from `finestvx.validation`
+- **`ILegislativePack.configure_localization(l10n)` protocol method** — called by
+  `FinestVXService.get_pack_localization()` immediately after boot to register pack-specific
+  custom Fluent functions (e.g., `ROUND_EUR`) into the booted `FluentLocalization`; packs
+  without custom functions implement it as a no-op
+- **`LedgerInvariantError` and `PersistenceIntegrityError` on storage load** — `load_book`
+  now raises structured integrity exceptions from `ftllexengine.integrity` when stored data
+  fails domain invariants (balance, chart-of-accounts) or cannot be deserialized; previously
+  raised bare `ValueError`/`TypeError`
+- **`tests/fuzz/` directory** — placeholder package for intensive fuzz-only tests carrying
+  `@pytest.mark.fuzz`; excluded from CI test runs
+- **`tests/strategy_metrics.py`** — `EXPECTED_EVENTS`, `STRATEGY_CATEGORIES`, and
+  `INTENDED_WEIGHTS` constants for runtime strategy coverage metrics during `--deep` fuzz runs
+- **Crash recording hook** (`tests/conftest.py`) — `pytest_runtest_makereport` writes
+  portable reproduction scripts and JSON metadata to `.hypothesis/crashes/` on test failure
+
+### Changed
+
+- **FTLLexEngine 0.156.0 is now the required minimum** — raises the lower bound from
+  `>=0.155.0` to `>=0.156.0`; required for `InterpreterPool`, `LedgerInvariantError`,
+  `PersistenceIntegrityError`, the `LocalizationBootConfig.boot()` API inversion, and
+  `clear_module_caches(components=...)` selective cache clearing
+- **`LegislativeInterpreterRunner` uses `InterpreterPool`** — replaces per-call interpreter
+  creation/destruction with a bounded reusable pool (default: `min_size=2`, `max_size=8`);
+  amortizes interpreter startup cost across the service lifetime
+- **`_load_book_from_connection` wraps deserialization and invariant checks** — structural
+  deserialization failures raise `PersistenceIntegrityError`; balance and chart-of-accounts
+  violations raise `LedgerInvariantError`; both carry `IntegrityContext` for audit trails
+- **`_wal_checkpoint_stats` deleted** — APSW 3.51.3.0+ stubs correctly type `wal_checkpoint()`
+  as `tuple[int, int]`; the helper existed solely to contain the `# type: ignore[index]`
+  suppression; with that suppression gone the method became a dead-weight single-call wrapper
+  around a write/side-effect operation; the `wal_checkpoint(mode=TRUNCATE)` call is inlined
+  directly into `create_snapshot`, which is the only call site
+- **`LatviaStandard2026Pack`** implements `localization_boot_config()` with declared
+  `required_messages` and `message_schemas` contracts for financial-grade boot validation
+- **`finestvx.core._validators`** — shared `require_non_empty_text` / `normalize_optional_text`
+  extracted to eliminate triplication across `core/models.py`, `core/serialization.py`, and
+  `legislation/protocols.py`
+- **Account cycle detection** (`core/models.py`) — replaced `ftllexengine.analysis.detect_cycles`
+  (general DFS, O(V*E)) with `_find_account_cycle()` (O(V) ancestor walk), removing the
+  coupling to FTL graph constants tuned for FTL resource graphs, not chart-of-accounts sizes
+
+### Fixed
+
+- **`validate_ftl_resource_schemas` now accessible from root `finestvx` package** — the
+  function was exported from `finestvx.validation` but absent from `finestvx.__all__` and
+  `_EXPORT_MAP`; `from finestvx import validate_ftl_resource_schemas` previously raised
+  `AttributeError` at runtime
+- **`FluentAmount` now exported from `finestvx.core` and root `finestvx`** — the type alias
+  `FluentAmount = FluentNumber` was declared in `finestvx.core.types` and present in
+  `finestvx.core.types.__all__` but not re-exported through `finestvx.core.__init__` or the
+  root facade; `from finestvx.core import FluentAmount` and `from finestvx import FluentAmount`
+  both previously raised `ImportError`
 
 ## [0.6.0] - 2026-03-16
 

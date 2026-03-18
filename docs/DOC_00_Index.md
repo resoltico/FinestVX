@@ -1,8 +1,8 @@
 ---
 afad: "3.3"
-version: "0.5.0"
+version: "0.7.0"
 domain: INDEX
-updated: "2026-03-16"
+updated: "2026-03-17"
 route:
   keywords: [finestvx api, bookkeeping core, persistence, runtime, localization boundary, ftllexengine, export, gateway, plugin system, validation]
   questions: ["what does finestvx export?", "where is persistence documented?", "where is the plugin system documented?", "where is the localization boundary documented?", "where is the gateway facade documented?", "where is validation documented?"]
@@ -20,6 +20,7 @@ from finestvx import (
     Book,
     BookCode,
     BookPeriod,
+    FluentAmount,
     FiscalPeriodState,
     JournalTransaction,
     LedgerEntry,
@@ -40,6 +41,7 @@ from finestvx import (
     ValidationSeverity,
     validate_book,
     validate_ftl_resource,
+    validate_ftl_resource_schemas,
     validate_legislative_transaction,
     validate_transaction,
 )
@@ -108,7 +110,7 @@ from finestvx import (
 | `Account`, `BookPeriod`, `LedgerEntry`, `JournalTransaction`, `Book` | [DOC_01_Core.md](DOC_01_Core.md) | Core |
 | `validate_chart_of_accounts`, `validate_transaction_balance` | [DOC_01_Core.md](DOC_01_Core.md) | Core |
 | `PostingSide`, `FiscalPeriodState`, `TransactionState` | [DOC_02_Types.md](DOC_02_Types.md) | Types |
-| `AccountCode`, `BookCode`, `LegislativePackCode`, `TransactionReference` | [DOC_02_Types.md](DOC_02_Types.md) | Types |
+| `AccountCode`, `BookCode`, `FluentAmount`, `LegislativePackCode`, `TransactionReference` | [DOC_02_Types.md](DOC_02_Types.md) | Types |
 | architecture, concurrency, PEP 750/734/784 usage | [DOC_03_Architecture.md](DOC_03_Architecture.md) | Architecture |
 | `ILegislativePack`, `LegislativePackMetadata`, `LegislativeIssue`, `LegislativeValidationResult` | [DOC_04_Legislation.md](DOC_04_Legislation.md) | Legislation |
 | `LegislativePackRegistry`, `create_default_pack_registry`, `LatviaStandard2026Pack` | [DOC_04_Legislation.md](DOC_04_Legislation.md) | Legislation |
@@ -125,6 +127,11 @@ from finestvx import (
 | `FinestVXServiceConfig`, `FinestVXService`, `GatewayDebugSnapshot`, `PostedTransactionResult` | [DOC_09_Exports_Gateway.md](DOC_09_Exports_Gateway.md) | Export and Gateway |
 | `ValidationSeverity`, `ValidationFinding`, `ValidationReport` | [DOC_10_Validation.md](DOC_10_Validation.md) | Validation |
 | `validate_book`, `validate_transaction`, `validate_ftl_resource`, `validate_legislative_transaction` | [DOC_10_Validation.md](DOC_10_Validation.md) | Validation |
+| `validate_ftl_resource_schemas` | [DOC_10_Validation.md](DOC_10_Validation.md) | Validation |
+| `LedgerInvariantError`, `PersistenceIntegrityError` (from `ftllexengine.integrity`) | [DOC_05_Errors.md](DOC_05_Errors.md) | Errors |
+| `ILegislativePack.configure_localization`, `localization_boot_config` | [DOC_04_Legislation.md](DOC_04_Legislation.md) | Legislation |
+| `FinestVXService.clear_caches` | [DOC_09_Exports_Gateway.md](DOC_09_Exports_Gateway.md) | Export and Gateway |
+| fuzz test placement, `@pytest.mark.fuzz`, `tests/strategy_metrics.py` | [DOC_06_Testing.md](DOC_06_Testing.md) | Testing |
 | FTLLexEngine dependency map and platform boundary | [FTLLEXENGINE_INTEGRATION.md](FTLLEXENGINE_INTEGRATION.md) | Integration |
 | plugin extension workflow, `ROUND_EUR` custom function | [PLUGIN_SYSTEM.md](PLUGIN_SYSTEM.md) | Plugin System |
 

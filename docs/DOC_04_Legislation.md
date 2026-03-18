@@ -1,10 +1,10 @@
 ---
 afad: "3.3"
-version: "0.5.0"
+version: "0.7.0"
 domain: SECONDARY
-updated: "2026-03-16"
+updated: "2026-03-17"
 route:
-  keywords: [legislative pack, pack protocol, pack registry, pack metadata, legislative issue, legislative result, subinterpreters, latvia 2026, function registry isolation]
+  keywords: [legislative pack, pack protocol, pack registry, pack metadata, legislative issue, legislative result, subinterpreters, latvia 2026, function registry isolation, localization boot config, configure localization, interpreter pool]
   questions: ["how does the finestvx plugin system work?", "what is an ILegislativePack?", "how are packs isolated at runtime?", "how is the Latvia pack implemented?", "how do i add a jurisdiction pack?"]
 ---
 
@@ -99,16 +99,19 @@ class ILegislativePack(Protocol):
         transaction: JournalTransaction,
     ) -> LegislativeValidationResult: ...
 
-    def create_localization(self) -> FluentLocalization: ...
+    def localization_boot_config(self) -> LocalizationBootConfig: ...
+    def configure_localization(self, l10n: FluentLocalization) -> None: ...
 ```
 
 ### Constraints
 - `metadata` must be immutable.
 - `function_registry` must be a pack-local unfrozen copy of the shared FTLLexEngine registry.
 - `validate_transaction`: business-rule validation; returns result, never raises on rule failures.
-- `create_localization`: returns a strict `FluentLocalization` for pack-local FTL resources.
-- Implementations should delegate boot assembly to `ftllexengine.localization.LocalizationBootConfig`
-  and apply `MANDATED_CACHE_CONFIG` instead of recreating loader/boot logic locally.
+- `localization_boot_config`: returns a `LocalizationBootConfig` with pack-local `required_messages`
+  and `message_schemas` declared; callers execute `.boot()` to obtain `(FluentLocalization, LoadSummary, ...)`.
+- `configure_localization`: called by the gateway immediately after `localization_boot_config().boot()`
+  to register pack-specific custom Fluent functions via `FluentLocalization.add_function()`; packs
+  without custom functions may implement as a no-op.
 
 ---
 
@@ -163,26 +166,36 @@ class LatviaStandard2026Pack:
 - `metadata.pack_code == "lv.standard.2026"`, `territory_code == "LV"`, `tax_year == 2026`, `currencies == ("EUR",)`.
 - Validation rule: any ledger entry with a non-`None` `tax_rate` not equal to `Decimal("0.21")` is flagged.
 - Validation rule: `book.legislative_pack != "lv.standard.2026"` is flagged.
-- `create_localization` loads FTL assets from `locales/lv_lv/` and `locales/en_us/` via
-  `LocalizationBootConfig.from_path(...).boot()` with `MANDATED_CACHE_CONFIG`.
-- Custom FTL function `ROUND_EUR` is registered via `@fluent_function`; quantizes financial amounts to 2 decimal places using `ROUND_HALF_UP`. FTL usage: `{ ROUND_EUR($amount) }`.
+- `localization_boot_config()` returns a `LocalizationBootConfig` with declared `required_messages`
+  and `message_schemas`; loads FTL assets from `locales/lv_lv/` and `locales/en_us/` applying
+  `MANDATED_CACHE_CONFIG`.
+- `configure_localization(l10n)` registers `ROUND_EUR` and all other pack functions into the booted
+  `FluentLocalization` via `l10n.add_function()`.
+- Custom FTL function `ROUND_EUR` quantizes financial amounts to 2 decimal places using `ROUND_HALF_UP`. FTL usage: `{ ROUND_EUR($amount) }`.
 - FTL messages: `latvia-pack-name`, `vat-standard-rate`, `vat-amount`.
 
 ---
 
 ## `LegislativeInterpreterRunner`
 
-Stateless runner that executes pack validation in a fresh PEP 734 subinterpreter.
+Stateful runner that dispatches pack validation through a bounded `InterpreterPool` of reusable PEP 734 subinterpreters.
 
 ### Signature
 ```python
+@dataclass(slots=True)
 class LegislativeInterpreterRunner:
+    pool_min_size: int = 2
+    pool_max_size: int = 8
+    _pool: InterpreterPool  # init=False; constructed from pool_min_size/pool_max_size
+
     def validate(
         self,
         pack_code: str,
         book: Book,
         transaction: JournalTransaction,
-    ) -> LegislativeValidationResult:
+    ) -> LegislativeValidationResult: ...
+
+    def close(self) -> None: ...
 ```
 
 ### Parameters
@@ -193,9 +206,14 @@ class LegislativeInterpreterRunner:
 | `transaction` | `JournalTransaction` | Y | Transaction to validate |
 
 ### Constraints
-- Creates and destroys one `interpreters.Interpreter` per call.
+- Holds a bounded `InterpreterPool` (default: `min_size=2`, `max_size=8`); interpreters are reused
+  across calls, amortizing PEP 734 interpreter startup cost.
+- `validate()` acquires one interpreter via context manager, executes `_validate_in_subinterpreter`,
+  and releases it back to the pool.
 - Pack crashes are isolated; they cannot corrupt the core runtime.
 - Return type is reconstructed from primitive round-trip data (no live objects cross interpreter boundary).
+- `close()` must be called on shutdown to release all pool interpreters; `FinestVXService.close()`
+  handles this automatically.
 
 ---
 
@@ -220,5 +238,5 @@ def validate_transaction_isolated(
 | `transaction` | `JournalTransaction` | Y | Transaction to validate |
 
 ### Constraints
-- Delegates to `LegislativeInterpreterRunner().validate(...)`.
+- Creates `LegislativeInterpreterRunner(pool_min_size=1, pool_max_size=1)` for a single call, then closes it.
 - Raises: `KeyError` when `pack_code` is not in the default registry.

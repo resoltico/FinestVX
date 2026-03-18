@@ -19,11 +19,13 @@ class TestLatviaStandard2026LocalizationIntegration:
 
     def test_pack_localization_boots_cleanly_with_mandated_cache_policy(self) -> None:
         """Pack localization uses strict upstream boot with FinestVX cache policy."""
-        service = LatviaStandard2026Pack().create_localization()
+        pack = LatviaStandard2026Pack()
+        service, summary, _schema_results = pack.localization_boot_config().boot()
+        pack.configure_localization(service)
         value, errors = service.format_value("latvia-pack-name")
 
         assert isinstance(service, FluentLocalization)
-        assert service.get_load_summary().all_clean is True
+        assert summary.all_clean is True
         assert service.cache_enabled is True
         assert service.cache_config == MANDATED_CACHE_CONFIG
         assert errors == ()
@@ -31,7 +33,9 @@ class TestLatviaStandard2026LocalizationIntegration:
 
     def test_pack_localization_exposes_upstream_ast_schema_and_audit_surfaces(self) -> None:
         """Pack localization exposes FTLLexEngine runtime helpers directly."""
-        service = LatviaStandard2026Pack().create_localization()
+        pack = LatviaStandard2026Pack()
+        service, _summary, _schema_results = pack.localization_boot_config().boot()
+        pack.configure_localization(service)
 
         value, errors = service.format_value(
             "vat-amount",

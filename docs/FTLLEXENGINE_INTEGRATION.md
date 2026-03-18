@@ -1,8 +1,8 @@
 ---
 afad: "3.3"
-version: "0.5.0"
+version: "0.7.0"
 domain: AUXILIARY
-updated: "2026-03-16"
+updated: "2026-03-17"
 route:
   keywords: [ftllexengine dependency map, localizationbootconfig, fluentlocalization, require locale code, decimal_value, make fluent number, parse fluent number, normalized locale code, cache config, rwlock, graph validation, fluent function, cache audit log]
   questions: ["what exactly does finestvx use from ftllexengine?", "why does finestvx depend on ftllexengine?", "which upstream primitives are active?", "what security boundaries come from ftllexengine?", "what functionality did finestvx delete in favor of ftllexengine?"]
@@ -16,6 +16,7 @@ FinestVX uses FTLLexEngine as an upstream platform dependency, not as copied pro
 
 ### Runtime and Concurrency
 - `RWLock`
+- `InterpreterPool`
 - `FluentNumber`
 - `FluentNumber.decimal_value`
 - `make_fluent_number()`
@@ -27,6 +28,7 @@ FinestVX uses FTLLexEngine as an upstream platform dependency, not as copied pro
 
 Why:
 - bounded writer-preference locking via the public `ftllexengine.runtime` facade;
+- `InterpreterPool` provides a reusable bounded pool of PEP 734 subinterpreters; `LegislativeInterpreterRunner` pre-warms interpreters at construction and reuses them across validation calls;
 - float-free value boundaries;
 - exact numeric extraction without local `FluentNumber -> Decimal` conversion helpers;
 - canonical `FluentNumber` construction without local precision helpers;
@@ -56,6 +58,8 @@ Why:
 - `IntegrityCheckFailedError`, `SyntaxIntegrityError`
 - `IntegrityContext`
 - `FrozenFluentError`
+- `LedgerInvariantError`
+- `PersistenceIntegrityError`
 
 Why:
 - FinestVX reuses the six-pass FTL validation pipeline and upstream integrity semantics;
@@ -65,7 +69,10 @@ Why:
 - strict parse failures still surface as `SyntaxIntegrityError` during eager resource loading;
 - `IntegrityContext` structures error payloads for `IntegrityCheckFailedError`, including both
   monotonic and wall-clock timestamps for correlation;
-- `FrozenFluentError` is the error type returned by all localized parsing functions.
+- `FrozenFluentError` is the error type returned by all localized parsing functions;
+- `LedgerInvariantError` is raised by `SqliteLedgerStore.load_book()` when a loaded book fails an accounting invariant (unbalanced transaction, duplicate account code), indicating storage corruption or a write-path bug;
+- `PersistenceIntegrityError` is raised by `SqliteLedgerStore.load_book()` when deserialization produces a value violating domain model invariants (unknown currency, precision violation), indicating a schema migration gap or storage tampering;
+- both integrity exceptions carry `IntegrityContext` for structured audit trail correlation.
 
 ### Localization and Parsing
 - `FluentLocalization`
@@ -117,10 +124,10 @@ Why:
 
 ### Graph Analysis
 - `detect_cycles()`
-- `make_cycle_key()`
 
 Why:
-- bounded account-cycle detection without separate graph machinery.
+- bounded account-cycle detection used by `detect_account_cycles()` in `finestvx.core.validation`;
+- `make_cycle_key()` is NOT used by FinestVX; cycle error messages are formatted locally.
 
 ## Public Boundary Rule
 

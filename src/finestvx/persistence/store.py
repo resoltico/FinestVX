@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import apsw
 import apsw.bestpractice as apsw_bestpractice
+from ftllexengine.integrity import IntegrityContext, LedgerInvariantError, PersistenceIntegrityError
 
 from finestvx.core.enums import TransactionState
 from finestvx.core.serialization import book_from_mapping, book_to_mapping
@@ -454,15 +455,51 @@ def _load_book_from_connection(connection: apsw.Connection, book_code: str) -> B
         )
         for tx_row in transaction_rows
     }
-    return book_from_mapping(
-        _build_book_payload(
-            book_row=cast("SQLiteRow", book_row),
-            account_rows=account_rows,
-            period_rows=period_rows,
-            transaction_rows=transaction_rows,
-            entry_rows_by_reference=entry_rows_by_reference,
-        )
+    integrity_context = IntegrityContext(
+        component="persistence.store",
+        operation="load_book",
+        key=book_code,
+        timestamp=time.monotonic(),
+        wall_time_unix=time.time(),
     )
+    try:
+        book = book_from_mapping(
+            _build_book_payload(
+                book_row=cast("SQLiteRow", book_row),
+                account_rows=account_rows,
+                period_rows=period_rows,
+                transaction_rows=transaction_rows,
+                entry_rows_by_reference=entry_rows_by_reference,
+            )
+        )
+    except (TypeError, ValueError) as exc:
+        msg = f"Stored book {book_code!r} could not be deserialized: {exc}"
+        raise PersistenceIntegrityError(msg, integrity_context) from exc
+    try:
+        validate_chart_of_accounts(book.accounts)
+    except (TypeError, ValueError) as exc:
+        msg = f"Stored book {book_code!r} failed chart-of-accounts invariant: {exc}"
+        raise LedgerInvariantError(
+            msg,
+            integrity_context,
+            invariant_code="COA_INVARIANT",
+            entity_ref=book_code,
+        ) from exc
+    for tx in book.transactions:
+        try:
+            validate_transaction_balance(tx)
+        except (TypeError, ValueError) as exc:
+            msg = (
+                f"Stored transaction {tx.reference!r} in book {book_code!r} "
+                f"failed balance invariant: {exc}"
+            )
+            raise LedgerInvariantError(
+                msg,
+                integrity_context,
+                invariant_code="TRANSACTION_BALANCE",
+                entity_ref=tx.reference,
+            ) from exc
+    return book
 
 
 async def _load_book_from_async_connection(connection: apsw.Connection, book_code: str) -> Book:
@@ -523,15 +560,51 @@ async def _load_book_from_async_connection(connection: apsw.Connection, book_cod
             """,
             (book_code, reference),
         )
-    return book_from_mapping(
-        _build_book_payload(
-            book_row=book_row,
-            account_rows=account_rows,
-            period_rows=period_rows,
-            transaction_rows=transaction_rows,
-            entry_rows_by_reference=entry_rows_by_reference,
-        )
+    integrity_context = IntegrityContext(
+        component="persistence.store",
+        operation="load_book",
+        key=book_code,
+        timestamp=time.monotonic(),
+        wall_time_unix=time.time(),
     )
+    try:
+        book = book_from_mapping(
+            _build_book_payload(
+                book_row=book_row,
+                account_rows=account_rows,
+                period_rows=period_rows,
+                transaction_rows=transaction_rows,
+                entry_rows_by_reference=entry_rows_by_reference,
+            )
+        )
+    except (TypeError, ValueError) as exc:
+        msg = f"Stored book {book_code!r} could not be deserialized: {exc}"
+        raise PersistenceIntegrityError(msg, integrity_context) from exc
+    try:
+        validate_chart_of_accounts(book.accounts)
+    except (TypeError, ValueError) as exc:
+        msg = f"Stored book {book_code!r} failed chart-of-accounts invariant: {exc}"
+        raise LedgerInvariantError(
+            msg,
+            integrity_context,
+            invariant_code="COA_INVARIANT",
+            entity_ref=book_code,
+        ) from exc
+    for tx in book.transactions:
+        try:
+            validate_transaction_balance(tx)
+        except (TypeError, ValueError) as exc:
+            msg = (
+                f"Stored transaction {tx.reference!r} in book {book_code!r} "
+                f"failed balance invariant: {exc}"
+            )
+            raise LedgerInvariantError(
+                msg,
+                integrity_context,
+                invariant_code="TRANSACTION_BALANCE",
+                entity_ref=tx.reference,
+            ) from exc
+    return book
 
 
 def _build_write_receipt(
@@ -1259,13 +1332,6 @@ class SqliteLedgerStore:
             recent_profile_events=recent_profile_events,
         )
 
-    def _wal_checkpoint_stats(self) -> tuple[int, int]:
-        """Return WAL checkpoint statistics as a normalized integer pair."""
-        wal_frames, checkpointed_frames = self._writer_connection.wal_checkpoint(
-            mode=apsw.SQLITE_CHECKPOINT_TRUNCATE
-        )
-        return (wal_frames, checkpointed_frames)
-
     def create_snapshot(
         self,
         output_path: Path | str,
@@ -1276,7 +1342,9 @@ class SqliteLedgerStore:
         destination = Path(output_path)
         destination.parent.mkdir(parents=True, exist_ok=True)
         with self._writer_lock:
-            wal_frames, checkpointed_frames = self._wal_checkpoint_stats()
+            wal_frames, checkpointed_frames = self._writer_connection.wal_checkpoint(
+                mode=apsw.SQLITE_CHECKPOINT_TRUNCATE,
+            )
             temp_path = destination.with_suffix(".sqlite3") if compress else destination
 
             destination_connection = apsw.Connection(str(temp_path), vfs=self._config.vfs_name)
