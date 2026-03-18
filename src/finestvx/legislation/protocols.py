@@ -6,11 +6,14 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
-from ftllexengine import require_locale_code, require_non_empty_str
+from ftllexengine import (
+    coerce_tuple,
+    require_locale_code,
+    require_non_empty_str,
+    require_non_negative_int,
+)
 from ftllexengine.integrity import IntegrityCheckFailedError, IntegrityContext
 from ftllexengine.introspection import is_valid_currency_code, is_valid_territory_code
-
-from finestvx.core._validators import _coerce_tuple
 
 if TYPE_CHECKING:
     from ftllexengine import FluentLocalization, LocalizationBootConfig
@@ -28,16 +31,6 @@ __all__ = [
 ]
 
 
-def _is_known_territory_code(value: str) -> bool:
-    """Return ``True`` when the string is a known ISO 3166-1 alpha-2 code."""
-    return bool(is_valid_territory_code(value))
-
-
-def _is_known_currency_code(value: str) -> bool:
-    """Return ``True`` when the string is a known ISO 4217 currency code."""
-    return bool(is_valid_currency_code(value))
-
-
 def _require_tax_year(value: object, field_name: str) -> int:
     """Validate a tax-year integer."""
     if isinstance(value, bool) or not isinstance(value, int):
@@ -45,17 +38,6 @@ def _require_tax_year(value: object, field_name: str) -> int:
         raise TypeError(msg)
     if not 1 <= value <= 9999:
         msg = f"{field_name} must be between 1 and 9999"
-        raise ValueError(msg)
-    return value
-
-
-def _require_non_negative_int(value: object, field_name: str) -> int:
-    """Validate a non-negative integer."""
-    if isinstance(value, bool) or not isinstance(value, int):
-        msg = f"{field_name} must be int, got {type(value).__name__}"
-        raise TypeError(msg)
-    if value < 0:
-        msg = f"{field_name} must be non-negative"
         raise ValueError(msg)
     return value
 
@@ -78,7 +60,7 @@ class LegislativePackMetadata:
             require_non_empty_str(self.pack_code, "pack_code"),
         )
         territory_code = require_non_empty_str(self.territory_code, "territory_code").upper()
-        if not _is_known_territory_code(territory_code):
+        if not is_valid_territory_code(territory_code):
             msg = f"territory_code must be a valid ISO 3166-1 alpha-2 code, got {territory_code!r}"
             raise ValueError(msg)
         object.__setattr__(self, "territory_code", territory_code)
@@ -88,7 +70,7 @@ class LegislativePackMetadata:
             "default_locale",
             require_locale_code(self.default_locale, "default_locale"),
         )
-        object.__setattr__(self, "currencies", _coerce_tuple(self.currencies, "currencies"))
+        object.__setattr__(self, "currencies", coerce_tuple(self.currencies, "currencies"))
         if len(self.currencies) == 0:
             msg = "currencies must not be empty"
             raise ValueError(msg)
@@ -97,7 +79,7 @@ class LegislativePackMetadata:
             for currency in self.currencies
         )
         for currency in normalized_currencies:
-            if not _is_known_currency_code(currency):
+            if not is_valid_currency_code(currency):
                 msg = f"currencies contains invalid ISO 4217 code {currency!r}"
                 raise ValueError(msg)
         object.__setattr__(self, "currencies", normalized_currencies)
@@ -120,7 +102,7 @@ class LegislativeIssue:
         object.__setattr__(
             self,
             "entry_index",
-            _require_non_negative_int(self.entry_index, "entry_index"),
+            require_non_negative_int(self.entry_index, "entry_index"),
         )
 
 
@@ -138,7 +120,7 @@ class LegislativeValidationResult:
             "pack_code",
             require_non_empty_str(self.pack_code, "pack_code"),
         )
-        object.__setattr__(self, "issues", _coerce_tuple(self.issues, "issues"))
+        object.__setattr__(self, "issues", coerce_tuple(self.issues, "issues"))
 
     @property
     def accepted(self) -> bool:

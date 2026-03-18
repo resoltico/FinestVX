@@ -7,6 +7,7 @@ from decimal import Decimal
 
 import pytest
 from ftllexengine import FiscalCalendar, FiscalPeriod, FluentNumber
+from ftllexengine.introspection import CurrencyCode
 
 from finestvx.core import (
     Account,
@@ -31,7 +32,7 @@ class TestAccount:
                 code="1000",
                 name="Cash",
                 normal_side=PostingSide.DEBIT,
-                currency="ZZZ1",
+                currency=CurrencyCode("ZZZ1"),
             )
 
     def test_rejects_self_parent(self) -> None:
@@ -41,7 +42,7 @@ class TestAccount:
                 code="1000",
                 name="Cash",
                 normal_side=PostingSide.DEBIT,
-                currency="EUR",
+                currency=CurrencyCode("EUR"),
                 parent_code="1000",
             )
 
@@ -69,7 +70,7 @@ class TestLedgerEntry:
                 account_code="1000",
                 side=PostingSide.DEBIT,
                 amount=FluentNumber(value=Decimal("-1.00"), formatted="-1.00", precision=2),
-                currency="EUR",
+                currency=CurrencyCode("EUR"),
             )
 
     def test_rejects_tax_rate_outside_ratio_range(self) -> None:
@@ -79,7 +80,7 @@ class TestLedgerEntry:
                 account_code="1000",
                 side=PostingSide.DEBIT,
                 amount=FluentNumber(value=Decimal("1.00"), formatted="1.00", precision=2),
-                currency="EUR",
+                currency=CurrencyCode("EUR"),
                 tax_rate=Decimal("1.21"),
             )
 
@@ -98,13 +99,13 @@ class TestJournalTransaction:
                     account_code="1000",
                     side=PostingSide.DEBIT,
                     amount=FluentNumber(value=Decimal("10.00"), formatted="10.00", precision=2),
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
                 LedgerEntry(
                     account_code="2000",
                     side=PostingSide.CREDIT,
                     amount=FluentNumber(value=Decimal("10.00"), formatted="10.00", precision=2),
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
             ),
         )
@@ -125,13 +126,13 @@ class TestJournalTransaction:
                         account_code="1000",
                         side=PostingSide.DEBIT,
                         amount=FluentNumber(value=Decimal("10.00"), formatted="10.00", precision=2),
-                        currency="EUR",
+                        currency=CurrencyCode("EUR"),
                     ),
                     LedgerEntry(
                         account_code="2000",
                         side=PostingSide.CREDIT,
                         amount=FluentNumber(value=Decimal("9.99"), formatted="9.99", precision=2),
-                        currency="EUR",
+                        currency=CurrencyCode("EUR"),
                     ),
                 ),
             )
@@ -147,25 +148,25 @@ class TestJournalTransaction:
                     account_code="1000",
                     side=PostingSide.DEBIT,
                     amount=FluentNumber(value=Decimal("10.00"), formatted="10.00", precision=2),
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
                 LedgerEntry(
                     account_code="2000",
                     side=PostingSide.CREDIT,
                     amount=FluentNumber(value=Decimal("10.00"), formatted="10.00", precision=2),
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
                 LedgerEntry(
                     account_code="3000",
                     side=PostingSide.DEBIT,
                     amount=FluentNumber(value=Decimal("5.00"), formatted="5.00", precision=2),
-                    currency="USD",
+                    currency=CurrencyCode("USD"),
                 ),
                 LedgerEntry(
                     account_code="4000",
                     side=PostingSide.CREDIT,
                     amount=FluentNumber(value=Decimal("5.00"), formatted="5.00", precision=2),
-                    currency="USD",
+                    currency=CurrencyCode("USD"),
                 ),
             ),
         )
@@ -186,14 +187,14 @@ class TestBook:
             code="1000",
             name="Cash",
             normal_side=PostingSide.DEBIT,
-            currency="EUR",
+            currency=CurrencyCode("EUR"),
         )
 
         with pytest.raises(ValueError, match="Duplicate account code"):
             Book(
                 code="demo",
                 name="Demo Book",
-                base_currency="EUR",
+                base_currency=CurrencyCode("EUR"),
                 legislative_pack="lv.standard.2026",
                 accounts=(account, account),
             )
@@ -204,21 +205,21 @@ class TestBook:
             Book(
                 code="demo",
                 name="Demo Book",
-                base_currency="EUR",
+                base_currency=CurrencyCode("EUR"),
                 legislative_pack="lv.standard.2026",
                 accounts=(
                     Account(
                         code="1000",
                         name="Cash",
                         normal_side=PostingSide.DEBIT,
-                        currency="EUR",
+                        currency=CurrencyCode("EUR"),
                         parent_code="2000",
                     ),
                     Account(
                         code="2000",
                         name="Receivables",
                         normal_side=PostingSide.DEBIT,
-                        currency="EUR",
+                        currency=CurrencyCode("EUR"),
                         parent_code="1000",
                     ),
                 ),
@@ -235,13 +236,13 @@ class TestBook:
                     account_code="1000",
                     side=PostingSide.DEBIT,
                     amount=FluentNumber(value=Decimal("10.00"), formatted="10.00", precision=2),
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
                 LedgerEntry(
                     account_code="2000",
                     side=PostingSide.CREDIT,
                     amount=FluentNumber(value=Decimal("10.00"), formatted="10.00", precision=2),
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
             ),
         )
@@ -250,14 +251,14 @@ class TestBook:
             Book(
                 code="demo",
                 name="Demo Book",
-                base_currency="EUR",
+                base_currency=CurrencyCode("EUR"),
                 legislative_pack="lv.standard.2026",
                 accounts=(
                     Account(
                         code="1000",
                         name="Cash",
                         normal_side=PostingSide.DEBIT,
-                        currency="EUR",
+                        currency=CurrencyCode("EUR"),
                     ),
                 ),
                 transactions=(transaction,),
@@ -275,13 +276,13 @@ class TestBook:
                     account_code="1000",
                     side=PostingSide.DEBIT,
                     amount=FluentNumber(value=Decimal("10.00"), formatted="10.00", precision=2),
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
                 LedgerEntry(
                     account_code="2000",
                     side=PostingSide.CREDIT,
                     amount=FluentNumber(value=Decimal("10.00"), formatted="10.00", precision=2),
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
             ),
         )
@@ -290,7 +291,7 @@ class TestBook:
             Book(
                 code="demo",
                 name="Demo Book",
-                base_currency="EUR",
+                base_currency=CurrencyCode("EUR"),
                 fiscal_calendar=FiscalCalendar(start_month=1),
                 legislative_pack="lv.standard.2026",
                 accounts=(
@@ -298,13 +299,13 @@ class TestBook:
                         code="1000",
                         name="Cash",
                         normal_side=PostingSide.DEBIT,
-                        currency="EUR",
+                        currency=CurrencyCode("EUR"),
                     ),
                     Account(
                         code="2000",
                         name="Revenue",
                         normal_side=PostingSide.CREDIT,
-                        currency="EUR",
+                        currency=CurrencyCode("EUR"),
                     ),
                 ),
                 periods=(
@@ -322,20 +323,20 @@ class TestBook:
         book = Book(
             code="demo",
             name="Demo Book",
-            base_currency="EUR",
+            base_currency=CurrencyCode("EUR"),
             legislative_pack="lv.standard.2026",
             accounts=(
                 Account(
                     code="1000",
                     name="Cash",
                     normal_side=PostingSide.DEBIT,
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
                 Account(
                     code="2000",
                     name="Revenue",
                     normal_side=PostingSide.CREDIT,
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
             ),
         )
@@ -348,13 +349,13 @@ class TestBook:
                     account_code="1000",
                     side=PostingSide.DEBIT,
                     amount=FluentNumber(value=Decimal("10.00"), formatted="10.00", precision=2),
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
                 LedgerEntry(
                     account_code="2000",
                     side=PostingSide.CREDIT,
                     amount=FluentNumber(value=Decimal("10.00"), formatted="10.00", precision=2),
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
             ),
         )
@@ -376,13 +377,13 @@ class TestBook:
                     account_code="1000",
                     side=PostingSide.DEBIT,
                     amount=FluentNumber(value=Decimal("10.00"), formatted="10.00", precision=2),
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
                 LedgerEntry(
                     account_code="2000",
                     side=PostingSide.CREDIT,
                     amount=FluentNumber(value=Decimal("10.00"), formatted="10.00", precision=2),
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
             ),
         )
@@ -391,20 +392,20 @@ class TestBook:
             Book(
                 code="demo",
                 name="Demo Book",
-                base_currency="EUR",
+                base_currency=CurrencyCode("EUR"),
                 legislative_pack="lv.standard.2026",
                 accounts=(
                     Account(
                         code="1000",
                         name="Cash",
                         normal_side=PostingSide.DEBIT,
-                        currency="EUR",
+                        currency=CurrencyCode("EUR"),
                     ),
                     Account(
                         code="2000",
                         name="Revenue",
                         normal_side=PostingSide.CREDIT,
-                        currency="EUR",
+                        currency=CurrencyCode("EUR"),
                     ),
                 ),
                 transactions=(draft_transaction,),

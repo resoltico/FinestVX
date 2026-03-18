@@ -9,14 +9,20 @@ from decimal import Decimal
 from itertools import pairwise
 from typing import TYPE_CHECKING, Final
 
-from ftllexengine import FiscalCalendar, FiscalPeriod, FluentNumber, require_non_empty_str
+from ftllexengine import (
+    FiscalCalendar,
+    FiscalPeriod,
+    FluentNumber,
+    coerce_tuple,
+    require_non_empty_str,
+)
 from ftllexengine.introspection import (
     CurrencyCode,
     get_currency_decimal_digits,
     is_valid_currency_code,
 )
 
-from ._validators import _coerce_tuple, normalize_optional_text
+from ._validators import normalize_optional_text
 from .enums import FiscalPeriodState, PostingSide, TransactionState
 
 if TYPE_CHECKING:
@@ -35,15 +41,10 @@ __all__ = [
 _ZERO: Final[Decimal] = Decimal(0)
 
 
-def _is_known_currency_code(value: str) -> bool:
-    """Return ``True`` when the string is a known ISO 4217 currency code."""
-    return bool(is_valid_currency_code(value))
-
-
 def _normalize_currency(value: object, field_name: str) -> CurrencyCode:
     """Validate and normalize an ISO 4217 currency code."""
     normalized = require_non_empty_str(value, field_name).upper()
-    if not _is_known_currency_code(normalized):
+    if not is_valid_currency_code(normalized):
         msg = f"{field_name} must be a valid ISO 4217 currency code, got {value!r}"
         raise ValueError(msg)
     return normalized
@@ -416,7 +417,7 @@ class JournalTransaction:
         """Validate transaction identity and balancing constraints.
 
         The entries field accepts any Sequence[LedgerEntry] at construction
-        and is normalized to tuple[LedgerEntry, ...] by _coerce_tuple.
+        and is normalized to tuple[LedgerEntry, ...] by coerce_tuple.
         After __post_init__ the field always holds an immutable tuple.
         """
         object.__setattr__(
@@ -434,7 +435,7 @@ class JournalTransaction:
             "description",
             require_non_empty_str(self.description, "description"),
         )
-        object.__setattr__(self, "entries", _coerce_tuple(self.entries, "entries"))
+        object.__setattr__(self, "entries", coerce_tuple(self.entries, "entries"))
         if self.period is not None:
             object.__setattr__(self, "period", _require_fiscal_period(self.period, "period"))
         object.__setattr__(self, "state", _require_transaction_state(self.state, "state"))
@@ -516,12 +517,12 @@ class Book:
             "legislative_pack",
             require_non_empty_str(self.legislative_pack, "legislative_pack"),
         )
-        object.__setattr__(self, "accounts", _coerce_tuple(self.accounts, "accounts"))
-        object.__setattr__(self, "periods", _coerce_tuple(self.periods, "periods"))
+        object.__setattr__(self, "accounts", coerce_tuple(self.accounts, "accounts"))
+        object.__setattr__(self, "periods", coerce_tuple(self.periods, "periods"))
         object.__setattr__(
             self,
             "transactions",
-            _coerce_tuple(self.transactions, "transactions"),
+            coerce_tuple(self.transactions, "transactions"),
         )
         _validate_account_collection(self.accounts)
         _validate_period_collection(self.periods)

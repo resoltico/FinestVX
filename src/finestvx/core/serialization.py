@@ -6,7 +6,14 @@ from collections.abc import Mapping, Sequence
 from datetime import date, datetime
 from decimal import Decimal
 
-from ftllexengine import FiscalCalendar, FiscalPeriod, make_fluent_number, require_non_empty_str
+from ftllexengine import (
+    FiscalCalendar,
+    FiscalPeriod,
+    make_fluent_number,
+    require_int,
+    require_non_empty_str,
+)
+from ftllexengine.introspection import CurrencyCode
 
 from ._validators import normalize_optional_text
 from .enums import FiscalPeriodState, PostingSide, TransactionState
@@ -52,13 +59,6 @@ def _require_datetime(value: object, field_name: str) -> datetime:
     return datetime.fromisoformat(value)
 
 
-def _require_int(value: object, field_name: str) -> int:
-    """Validate an integer field."""
-    if isinstance(value, bool) or not isinstance(value, int):
-        msg = f"{field_name} must be int, got {type(value).__name__}"
-        raise TypeError(msg)
-    return value
-
 
 def _require_decimal(value: object, field_name: str) -> Decimal:
     """Parse a decimal value from its text representation."""
@@ -81,9 +81,9 @@ def _period_from_mapping(payload: object, field_name: str) -> FiscalPeriod:
     """Deserialize a fiscal period from a mapping."""
     data = _require_mapping(payload, field_name)
     return FiscalPeriod(
-        fiscal_year=_require_int(data["fiscal_year"], f"{field_name}.fiscal_year"),
-        quarter=_require_int(data["quarter"], f"{field_name}.quarter"),
-        month=_require_int(data["month"], f"{field_name}.month"),
+        fiscal_year=require_int(data["fiscal_year"], f"{field_name}.fiscal_year"),
+        quarter=require_int(data["quarter"], f"{field_name}.quarter"),
+        month=require_int(data["month"], f"{field_name}.month"),
     )
 
 
@@ -108,7 +108,7 @@ def _entry_from_mapping(payload: object) -> LedgerEntry:
         account_code=require_non_empty_str(data["account_code"], "entry.account_code"),
         side=PostingSide(require_non_empty_str(data["side"], "entry.side")),
         amount=make_fluent_number(amount),
-        currency=require_non_empty_str(data["currency"], "entry.currency"),
+        currency=CurrencyCode(require_non_empty_str(data["currency"], "entry.currency")),
         description=normalize_optional_text(data.get("description"), "entry.description"),
         tax_rate=None if tax_rate is None else _require_decimal(tax_rate, "entry.tax_rate"),
     )
@@ -165,7 +165,7 @@ def _account_from_mapping(payload: object) -> Account:
         code=require_non_empty_str(data["code"], "account.code"),
         name=require_non_empty_str(data["name"], "account.name"),
         normal_side=PostingSide(require_non_empty_str(data["normal_side"], "account.normal_side")),
-        currency=require_non_empty_str(data["currency"], "account.currency"),
+        currency=CurrencyCode(require_non_empty_str(data["currency"], "account.currency")),
         parent_code=normalize_optional_text(data.get("parent_code"), "account.parent_code"),
         allow_posting=bool(data.get("allow_posting", True)),
         active=bool(data.get("active", True)),
@@ -214,9 +214,11 @@ def book_from_mapping(payload: object) -> Book:
     return Book(
         code=require_non_empty_str(data["code"], "book.code"),
         name=require_non_empty_str(data["name"], "book.name"),
-        base_currency=require_non_empty_str(data["base_currency"], "book.base_currency"),
+        base_currency=CurrencyCode(
+            require_non_empty_str(data["base_currency"], "book.base_currency")
+        ),
         fiscal_calendar=FiscalCalendar(
-            start_month=_require_int(
+            start_month=require_int(
                 fiscal_calendar["start_month"],
                 "book.fiscal_calendar.start_month",
             )

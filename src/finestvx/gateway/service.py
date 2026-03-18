@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal
 
-import ftllexengine
+from ftllexengine import clear_module_caches
 
 from finestvx.export import ExportArtifact, LedgerExporter
 from finestvx.legislation import (
@@ -234,7 +234,7 @@ class FinestVXService:
                 ``'runtime.locale_context'``, ``'introspection.message'``,
                 ``'introspection.iso'``.
         """
-        ftllexengine.clear_module_caches(components)
+        clear_module_caches(components)
 
     def debug_snapshot(self) -> GatewayDebugSnapshot:
         """Return a non-invasive snapshot for service-level introspection."""

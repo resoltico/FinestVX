@@ -8,6 +8,7 @@ from typing import Any, cast
 
 import pytest
 from ftllexengine import FiscalCalendar, FiscalPeriod, FluentNumber, make_fluent_number
+from ftllexengine.introspection import CurrencyCode
 
 import finestvx.core._validators as validators_module
 import finestvx.core.models as models_module
@@ -36,9 +37,23 @@ class TestCoreModelHelpers:
         with pytest.raises(ValueError, match="tax_rate must be finite"):
             models_module._require_decimal_ratio(Decimal("NaN"), "tax_rate")
 
-        assert models_module._coerce_tuple([1, 2], "items") == (1, 2)
-        with pytest.raises(TypeError, match="items must be a sequence"):
-            models_module._coerce_tuple({1, 2}, "items")
+    def test_sequence_fields_accept_list_input_and_normalize_to_tuple(self) -> None:
+        """Sequence-typed model fields accept list input and normalize to immutable tuple."""
+        entry = LedgerEntry(
+            account_code="1000",
+            side=PostingSide.DEBIT,
+            amount=make_fluent_number(Decimal("10.00")),
+            currency=CurrencyCode("EUR"),
+        )
+        tx = JournalTransaction(
+            reference="TX-2026-0001",
+            posted_at=_POSTED_AT,
+            description="Coerce test",
+            state=TransactionState.DRAFT,
+            entries=[entry],
+        )
+        assert isinstance(tx.entries, tuple)
+        assert tx.entries == (entry,)
 
     def test_amount_and_enum_helpers_reject_invalid_values(self) -> None:
         """Amount coercion and enum validators defend against bad runtime types."""
@@ -53,7 +68,7 @@ class TestCoreModelHelpers:
                 account_code="1000",
                 side=PostingSide.DEBIT,
                 amount=FluentNumber(value=Decimal("Infinity"), formatted="Infinity", precision=0),
-                currency="EUR",
+                currency=CurrencyCode("EUR"),
             )
 
         with pytest.raises(TypeError, match="side must be PostingSide"):
@@ -77,13 +92,13 @@ class TestCoreModelHelpers:
             code="1000",
             name="Cash",
             normal_side=PostingSide.DEBIT,
-            currency="EUR",
+            currency=CurrencyCode("EUR"),
         )
         revenue = Account(
             code="2000",
             name="Revenue",
             normal_side=PostingSide.CREDIT,
-            currency="EUR",
+            currency=CurrencyCode("EUR"),
         )
         valid_period = BookPeriod(
             period=FiscalPeriod(fiscal_year=2026, quarter=1, month=1),
@@ -105,7 +120,7 @@ class TestCoreModelHelpers:
                         code="3000",
                         name="Receivable",
                         normal_side=PostingSide.DEBIT,
-                        currency="EUR",
+                        currency=CurrencyCode("EUR"),
                         parent_code="9999",
                     ),
                 )
@@ -131,7 +146,7 @@ class TestCoreModelHelpers:
             account_code="1000",
             side=PostingSide.DEBIT,
             amount=make_fluent_number(Decimal("1.00")),
-            currency="EUR",
+            currency=CurrencyCode("EUR"),
         )
         with pytest.raises(ValueError, match="at least two entries"):
             models_module._validate_transaction_entries((one_entry,))
@@ -151,7 +166,7 @@ class TestCoreModelHelpers:
                     account_code="2000",
                     side=PostingSide.CREDIT,
                     amount=make_fluent_number(Decimal("1.00")),
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
             ),
         )
@@ -171,7 +186,7 @@ class TestCoreModelHelpers:
                     account_code="2000",
                     side=PostingSide.CREDIT,
                     amount=make_fluent_number(Decimal("1.00")),
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
             ),
         )
@@ -181,7 +196,7 @@ class TestCoreModelHelpers:
         book = Book(
             code="demo-book",
             name="Demo Book",
-            base_currency="EUR",
+            base_currency=CurrencyCode("EUR"),
             fiscal_calendar=FiscalCalendar(start_month=1),
             legislative_pack="lv.standard.2026",
             accounts=(cash, revenue),
@@ -194,7 +209,7 @@ class TestCoreModelHelpers:
                 code="3000",
                 name="VAT",
                 normal_side=PostingSide.CREDIT,
-                currency="EUR",
+                currency=CurrencyCode("EUR"),
             )
         )
         assert len(updated_book.accounts) == 3
@@ -211,7 +226,7 @@ class TestLedgerEntryCurrencyPrecision:
                 account_code="1000",
                 side=PostingSide.DEBIT,
                 amount=make_fluent_number(Decimal("10.001")),
-                currency="EUR",
+                currency=CurrencyCode("EUR"),
             )
 
     def test_eur_accepts_two_decimal_places(self) -> None:
@@ -220,7 +235,7 @@ class TestLedgerEntryCurrencyPrecision:
             account_code="1000",
             side=PostingSide.DEBIT,
             amount=make_fluent_number(Decimal("10.00")),
-            currency="EUR",
+            currency=CurrencyCode("EUR"),
         )
         assert entry.decimal_value == Decimal("10.00")
 
@@ -231,7 +246,7 @@ class TestLedgerEntryCurrencyPrecision:
                 account_code="1000",
                 side=PostingSide.DEBIT,
                 amount=make_fluent_number(Decimal("100.5")),
-                currency="JPY",
+                currency=CurrencyCode("JPY"),
             )
 
     def test_jpy_accepts_integer_amounts(self) -> None:
@@ -240,7 +255,7 @@ class TestLedgerEntryCurrencyPrecision:
             account_code="1000",
             side=PostingSide.DEBIT,
             amount=make_fluent_number(Decimal(1000)),
-            currency="JPY",
+            currency=CurrencyCode("JPY"),
         )
         assert entry.decimal_value == Decimal(1000)
 
@@ -250,7 +265,7 @@ class TestLedgerEntryCurrencyPrecision:
             account_code="1000",
             side=PostingSide.DEBIT,
             amount=make_fluent_number(Decimal("1.234")),
-            currency="KWD",
+            currency=CurrencyCode("KWD"),
         )
         assert entry.decimal_value == Decimal("1.234")
 
@@ -265,7 +280,7 @@ class TestCoreModelConstructors:
                 code="1000",
                 name="Cash",
                 normal_side=cast("Any", "Dr"),
-                currency="EUR",
+                currency=CurrencyCode("EUR"),
             )
 
         with pytest.raises(TypeError, match="amount must be FluentNumber"):
@@ -273,10 +288,10 @@ class TestCoreModelConstructors:
                 account_code="1000",
                 side=PostingSide.DEBIT,
                 amount=cast("Any", "1.00"),
-                currency="EUR",
+                currency=CurrencyCode("EUR"),
             )
 
-        with pytest.raises(TypeError, match="entries must be a sequence"):
+        with pytest.raises(TypeError, match=r"entries must be a non-str Sequence"):
             JournalTransaction(
                 reference="TX-2026-1000",
                 posted_at=_POSTED_AT,
@@ -307,7 +322,7 @@ class TestCoreModelConstructors:
                     account_code="1000",
                     side=PostingSide.DEBIT,
                     amount=make_fluent_number(Decimal("10.00")),
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
             ),
         )
@@ -333,7 +348,7 @@ class TestCoreModelConstructors:
             Book(
                 code="demo-book",
                 name="Demo Book",
-                base_currency="EUR",
+                base_currency=CurrencyCode("EUR"),
                 fiscal_calendar=FiscalCalendar(start_month=1),
                 legislative_pack="lv.standard.2026",
                 accounts=(),

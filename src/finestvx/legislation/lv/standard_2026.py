@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from ftllexengine import FluentNumber, LocalizationBootConfig, make_fluent_number
+from ftllexengine.introspection import CurrencyCode, TerritoryCode
 from ftllexengine.runtime import FunctionRegistry, fluent_function, get_shared_registry
 
 from finestvx.legislation.protocols import (
@@ -66,10 +67,10 @@ def _build_metadata() -> LegislativePackMetadata:
     """Create metadata for the Latvia standard 2026 pack."""
     return LegislativePackMetadata(
         pack_code="lv.standard.2026",
-        territory_code="LV",
+        territory_code=TerritoryCode("LV"),
         tax_year=2026,
         default_locale="lv-LV",
-        currencies=("EUR",),
+        currencies=(CurrencyCode("EUR"),),
     )
 
 

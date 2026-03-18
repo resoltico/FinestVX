@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 from ftllexengine import FluentNumber
+from ftllexengine.introspection import CurrencyCode
 from ftllexengine.runtime import get_shared_registry
 
 from finestvx import (
@@ -70,20 +71,20 @@ class TestLatviaStandard2026Pack:
         book = Book(
             code="lv-book",
             name="Latvia Book",
-            base_currency="EUR",
+            base_currency=CurrencyCode("EUR"),
             legislative_pack="lv.standard.2026",
             accounts=(
                 Account(
                     code="1000",
                     name="Cash",
                     normal_side=PostingSide.DEBIT,
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
                 Account(
                     code="2000",
                     name="Revenue",
                     normal_side=PostingSide.CREDIT,
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
             ),
         )
@@ -96,14 +97,14 @@ class TestLatviaStandard2026Pack:
                     account_code="1000",
                     side=PostingSide.DEBIT,
                     amount=FluentNumber(value=Decimal("121.00"), formatted="121.00", precision=2),
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                     tax_rate=Decimal("0.21"),
                 ),
                 LedgerEntry(
                     account_code="2000",
                     side=PostingSide.CREDIT,
                     amount=FluentNumber(value=Decimal("121.00"), formatted="121.00", precision=2),
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                     tax_rate=Decimal("0.21"),
                 ),
             ),
@@ -120,20 +121,20 @@ class TestLatviaStandard2026Pack:
         book = Book(
             code="lv-book",
             name="Latvia Book",
-            base_currency="EUR",
+            base_currency=CurrencyCode("EUR"),
             legislative_pack="lv.standard.2026",
             accounts=(
                 Account(
                     code="1000",
                     name="Cash",
                     normal_side=PostingSide.DEBIT,
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
                 Account(
                     code="2000",
                     name="Revenue",
                     normal_side=PostingSide.CREDIT,
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
             ),
         )
@@ -146,14 +147,14 @@ class TestLatviaStandard2026Pack:
                     account_code="1000",
                     side=PostingSide.DEBIT,
                     amount=FluentNumber(value=Decimal("112.00"), formatted="112.00", precision=2),
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                     tax_rate=Decimal("0.12"),
                 ),
                 LedgerEntry(
                     account_code="2000",
                     side=PostingSide.CREDIT,
                     amount=FluentNumber(value=Decimal("112.00"), formatted="112.00", precision=2),
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                     tax_rate=Decimal("0.12"),
                 ),
             ),
@@ -173,20 +174,20 @@ class TestLatviaStandard2026Pack:
         book = Book(
             code="lv-book",
             name="Latvia Book",
-            base_currency="EUR",
+            base_currency=CurrencyCode("EUR"),
             legislative_pack="other.pack",
             accounts=(
                 Account(
                     code="1000",
                     name="Cash",
                     normal_side=PostingSide.DEBIT,
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
                 Account(
                     code="2000",
                     name="Revenue",
                     normal_side=PostingSide.CREDIT,
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
             ),
         )
@@ -199,13 +200,13 @@ class TestLatviaStandard2026Pack:
                     account_code="1000",
                     side=PostingSide.DEBIT,
                     amount=FluentNumber(value=Decimal("10.00"), formatted="10.00", precision=2),
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
                 LedgerEntry(
                     account_code="2000",
                     side=PostingSide.CREDIT,
                     amount=FluentNumber(value=Decimal("10.00"), formatted="10.00", precision=2),
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
             ),
         )

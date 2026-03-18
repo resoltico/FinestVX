@@ -7,6 +7,7 @@ from decimal import Decimal
 
 import pytest
 from ftllexengine import FluentNumber
+from ftllexengine.introspection import CurrencyCode
 
 from finestvx.core import (
     Account,
@@ -17,6 +18,7 @@ from finestvx.core import (
 )
 from finestvx.core.validation import (
     account_dependency_map,
+    debit_totals_by_currency,
     detect_account_cycles,
     validate_chart_of_accounts,
     validate_transaction_balance,
@@ -35,13 +37,13 @@ class TestValidationHelpers:
                 code="1000",
                 name="Assets",
                 normal_side=PostingSide.DEBIT,
-                currency="EUR",
+                currency=CurrencyCode("EUR"),
             ),
             Account(
                 code="1100",
                 name="Cash",
                 normal_side=PostingSide.DEBIT,
-                currency="EUR",
+                currency=CurrencyCode("EUR"),
                 parent_code="1000",
             ),
         )
@@ -65,16 +67,42 @@ class TestValidationHelpers:
                     account_code="1000",
                     side=PostingSide.DEBIT,
                     amount=FluentNumber(value=Decimal("10.00"), formatted="10.00", precision=2),
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
                 LedgerEntry(
                     account_code="2000",
                     side=PostingSide.CREDIT,
                     amount=FluentNumber(value=Decimal("9.00"), formatted="9.00", precision=2),
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
             ),
         )
 
         with pytest.raises(ValueError, match="not balanced"):
             validate_transaction_balance(transaction)
+
+    def test_debit_totals_by_currency_aggregates_debit_entries(self) -> None:
+        """debit_totals_by_currency returns aggregated debit amounts keyed by currency."""
+        transaction = JournalTransaction(
+            reference="TX-VAL-0002",
+            posted_at=_POSTED_AT,
+            description="Debit totals",
+            state=TransactionState.DRAFT,
+            entries=(
+                LedgerEntry(
+                    account_code="1000",
+                    side=PostingSide.DEBIT,
+                    amount=FluentNumber(value=Decimal("5.00"), formatted="5.00", precision=2),
+                    currency=CurrencyCode("EUR"),
+                ),
+                LedgerEntry(
+                    account_code="2000",
+                    side=PostingSide.CREDIT,
+                    amount=FluentNumber(value=Decimal("5.00"), formatted="5.00", precision=2),
+                    currency=CurrencyCode("EUR"),
+                ),
+            ),
+        )
+
+        totals = debit_totals_by_currency(transaction)
+        assert totals == {CurrencyCode("EUR"): Decimal("5.00")}

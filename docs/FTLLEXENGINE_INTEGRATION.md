@@ -1,10 +1,10 @@
 ---
 afad: "3.3"
-version: "0.7.0"
+version: "0.9.0"
 domain: AUXILIARY
-updated: "2026-03-17"
+updated: "2026-03-18"
 route:
-  keywords: [ftllexengine dependency map, localizationbootconfig, fluentlocalization, require locale code, decimal_value, make fluent number, parse fluent number, normalized locale code, cache config, rwlock, graph validation, fluent function, cache audit log]
+  keywords: [ftllexengine dependency map, localizationbootconfig, fluentlocalization, require locale code, require non empty str, require positive int, clear module caches, decimal_value, make fluent number, parse fluent number, normalized locale code, cache config, rwlock, graph validation, fluent function, cache audit log]
   questions: ["what exactly does finestvx use from ftllexengine?", "why does finestvx depend on ftllexengine?", "which upstream primitives are active?", "what security boundaries come from ftllexengine?", "what functionality did finestvx delete in favor of ftllexengine?"]
 ---
 
@@ -37,6 +37,22 @@ Why:
 - shared cache policy expression;
 - public cache audit-log typing without internal imports.
 
+### Boundary Validators
+- `require_non_empty_str()`
+- `require_positive_int()`
+- `require_non_negative_int()`
+- `require_int()`
+- `coerce_tuple()`
+- `clear_module_caches()`
+
+Why:
+- `require_non_empty_str` is the sole text-field validator at all FinestVX domain-model boundaries — `AuditContext`, `LegislativePackMetadata`, `LegislativePackRegistry`, and all serialization entry points delegate to it; FinestVX ships no private equivalent;
+- `require_positive_int` validates positive-integer domain fields in `PersistenceConfig`, `RuntimeConfig`, and `LegislativeInterpreterRunner`; FinestVX ships no private equivalent;
+- `require_non_negative_int` validates zero-based index fields such as `LegislativeIssue.entry_index`; semantically distinct from `require_positive_int` which rejects zero;
+- `require_int` validates type-only integer guards at serialization boundaries (`fiscal_year`, `quarter`, `month`, `start_month`) where the domain model owns range validation; no positivity check is performed;
+- `coerce_tuple` normalizes any non-str `Sequence` to an immutable tuple in all frozen-dataclass `__post_init__` methods (`Book.accounts`, `Book.periods`, `Book.transactions`, `JournalTransaction.entries`, `LegislativePackMetadata.currencies`, `LegislativeValidationResult.issues`); FinestVX ships no private equivalent;
+- `clear_module_caches` is called by `FinestVXService.clear_caches()` to release locale/CLDR/introspection cache memory in long-running deployments.
+
 ### Fiscal and ISO Boundaries
 - `FiscalCalendar`, `FiscalPeriod`
 - `CurrencyCode`, `TerritoryCode`
@@ -46,6 +62,9 @@ Why:
 
 Why:
 - FinestVX does not duplicate fiscal arithmetic or ISO reference tables;
+- `CurrencyCode` and `TerritoryCode` are `NewType` wrappers over `str` (since v0.158.0);
+  FinestVX domain models type all currency and territory fields with these brands; call sites
+  pass `CurrencyCode("EUR")` / `TerritoryCode("LV")` to satisfy the nominal type system;
 - `TerritoryCode` types `LegislativePackMetadata.territory_code`; `is_valid_territory_code()` validates it at construction;
 - locale-bearing FinestVX metadata/config is validated and canonicalized with `require_locale_code()`;
 - `get_currency_decimal_digits()` enforces ISO 4217 decimal precision in `LedgerEntry` construction (e.g., JPY=0, EUR=2, KWD=3).
@@ -149,7 +168,13 @@ FinestVX no longer ships a `finestvx.localization` wrapper package.
   `validate_message_variables()` and `validate_message_schemas()`;
 - local `parse_amount_input` and `AmountParseResult` were removed; callers use
   `ftllexengine.parsing.parse_fluent_number()` directly;
-- duplicate raw parse aliases were removed; callers use `ftllexengine.parsing` directly.
+- duplicate raw parse aliases were removed; callers use `ftllexengine.parsing` directly;
+- private `require_non_empty_text` helper was removed from `finestvx.core._validators`; all callsites now use `ftllexengine.require_non_empty_str` directly;
+- private `_is_known_currency_code` and `_is_known_territory_code` bool-returning wrappers were removed from `core/models.py` and `legislation/protocols.py`; callsites now invoke `is_valid_currency_code` and `is_valid_territory_code` from `ftllexengine.introspection` directly;
+- private `_require_int` (type-only integer guard) was removed from `core/serialization.py`; deserialization fields now use `ftllexengine.require_int` (type-only) or `ftllexengine.require_positive_int` (type + range) as semantically appropriate;
+- private `_require_non_negative_int` was removed from `legislation/protocols.py`; `LegislativeIssue.entry_index` validation now uses `ftllexengine.require_non_negative_int`;
+- private `_coerce_tuple[T]` was removed from `core/_validators.py`; all frozen-dataclass sequence normalization now uses `ftllexengine.coerce_tuple`;
+- namespace `import ftllexengine` in `gateway/service.py` replaced by `from ftllexengine import clear_module_caches`.
 
 ## Why FinestVX Uses FTLLexEngine
 

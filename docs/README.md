@@ -13,4 +13,3 @@ route:
 This directory contains the AFAD-style reference documentation for FinestVX.
 
 Start with `DOC_00_Index.md` for symbol routing.
-The documentation protocol is in `.claude/PROTOCOL_AFAD.md`.

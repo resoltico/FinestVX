@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
+from ftllexengine.introspection import CurrencyCode
 
 import finestvx
 import finestvx.persistence as persistence_module
@@ -62,7 +63,7 @@ class TestPersistenceAndRuntimeEdges:
             PersistenceConfig(tmp_path / "db.sqlite3", reserve_bytes=256)
         with pytest.raises(ValueError, match="telemetry_buffer_size must be non-negative"):
             PersistenceConfig(tmp_path / "db.sqlite3", telemetry_buffer_size=-1)
-        with pytest.raises(ValueError, match="vfs_name must not be blank"):
+        with pytest.raises(ValueError, match="vfs_name cannot be blank"):
             PersistenceConfig(tmp_path / "db.sqlite3", vfs_name="   ")
         with pytest.raises(ValueError, match="queue_timeout must be positive"):
             RuntimeConfig(PersistenceConfig(tmp_path / "db.sqlite3"), queue_timeout=0)
@@ -113,7 +114,7 @@ class TestPersistenceAndRuntimeEdges:
                     account_code="9999",
                     side=PostingSide.CREDIT,
                     amount=base_transaction.entries[1].amount,
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
             ),
         )

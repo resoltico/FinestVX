@@ -7,6 +7,7 @@ from decimal import Decimal
 
 import pytest
 from ftllexengine import FiscalCalendar, FiscalPeriod, make_fluent_number
+from ftllexengine.introspection import CurrencyCode
 
 import finestvx.core._validators as validators_module
 import finestvx.core.serialization as serialization_module
@@ -40,7 +41,7 @@ class TestSerializationHelpers:
                     account_code="1100",
                     side=PostingSide.DEBIT,
                     amount=make_fluent_number(Decimal("12.34"), formatted="12,34"),
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                     description="Debit line",
                     tax_rate=Decimal("0.21"),
                 ),
@@ -48,14 +49,14 @@ class TestSerializationHelpers:
                     account_code="2100",
                     side=PostingSide.CREDIT,
                     amount=make_fluent_number(Decimal("12.34")),
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
             ),
         )
         book = Book(
             code="demo-book",
             name="Demo Book",
-            base_currency="EUR",
+            base_currency=CurrencyCode("EUR"),
             fiscal_calendar=FiscalCalendar(start_month=4),
             legislative_pack="lv.standard.2026",
             accounts=(
@@ -63,20 +64,20 @@ class TestSerializationHelpers:
                     code="1000",
                     name="Assets",
                     normal_side=PostingSide.DEBIT,
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
                 Account(
                     code="1100",
                     name="Cash",
                     normal_side=PostingSide.DEBIT,
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                     parent_code="1000",
                 ),
                 Account(
                     code="2100",
                     name="Revenue",
                     normal_side=PostingSide.CREDIT,
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
             ),
             periods=(
@@ -117,8 +118,10 @@ class TestSerializationHelpers:
             serialization_module._require_date(1, "start_date")
         with pytest.raises(TypeError, match="posted_at must be ISO datetime text"):
             serialization_module._require_datetime(1, "posted_at")
-        with pytest.raises(TypeError, match="start_month must be int"):
-            serialization_module._require_int(True, "start_month")
+        with pytest.raises(TypeError, match=r"period\.fiscal_year must be int"):
+            serialization_module._period_from_mapping(
+                {"fiscal_year": True, "quarter": 1, "month": 1}, "period"
+            )
         with pytest.raises(TypeError, match="amount must be decimal text"):
             serialization_module._require_decimal(1, "amount")
 

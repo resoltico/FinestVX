@@ -1,6 +1,6 @@
 ---
 afad: "3.3"
-version: "0.8.0"
+version: "0.9.0"
 domain: CHANGELOG
 updated: "2026-03-18"
 route:
@@ -14,6 +14,43 @@ Notable changes to this project are documented in this file. The format is based
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.9.0] - 2026-03-18
+
+### Refactored
+
+- **`_require_non_negative_int` removed from `legislation/protocols.py`** — replaced by
+  `ftllexengine.require_non_negative_int`; `LegislativeIssue.entry_index` validation now
+  delegates to the upstream primitive
+- **`_coerce_tuple[T]` removed from `core/_validators.py`** — replaced by
+  `ftllexengine.coerce_tuple`; all sequence-field normalization in `core/models.py` and
+  `legislation/protocols.py` now delegates to the upstream primitive; `_validators.py` now
+   contains only `normalize_optional_text`
+- **`_require_int` removed from `core/serialization.py`** — replaced by
+  `ftllexengine.require_int`; deserialization boundaries (`fiscal_year`, `quarter`, `month`,
+  `start_month`) now use the semantically precise type-only guard rather than
+  `require_positive_int`'s unneeded positivity check
+- **`CurrencyCode` and `TerritoryCode` call sites wrapped** — FTLLexEngine v0.158.0 converted
+  both from PEP 695 `type` aliases to `NewType` wrappers; all FinestVX construction sites
+  (serialization, legislation, tests, support) now pass `CurrencyCode("EUR")` /
+  `TerritoryCode("LV")` instead of bare string literals
+- **`_is_known_currency_code` and `_is_known_territory_code` wrappers eliminated** —
+  `core/models.py` and `legislation/protocols.py` now call `is_valid_currency_code` and
+  `is_valid_territory_code` from `ftllexengine.introspection` directly; removes redundant
+  bool-returning one-liner wrappers that added no invariant beyond a simple delegation
+- **`LegislativeInterpreterRunner` validates pool bounds in `__post_init__`** — `pool_min_size`
+  now validated via `ftllexengine.require_positive_int`; pool bound validation is co-located
+  with the pool initialization rather than deferred to runtime
+- **`gateway/service.py` import style normalized** — `import ftllexengine` namespace replaced by
+  `from ftllexengine import clear_module_caches`; consistent with direct-import style used
+  throughout all other FinestVX modules
+
+### Fixed
+
+- **`# type: ignore[unreachable]` waivers removed** — FTLLexEngine v0.158.0 converted
+  `CurrencyCode` and `TerritoryCode` to `NewType`; the false-branch of
+  `if not is_valid_currency_code(x):` is now reachable at the type level; all three waivers
+  in `core/models.py` and `legislation/protocols.py` removed
 
 ## [0.8.0] - 2026-03-18
 

@@ -6,6 +6,7 @@ from typing import Any, cast
 
 import pytest
 from ftllexengine.integrity import IntegrityCheckFailedError
+from ftllexengine.introspection import CurrencyCode, TerritoryCode
 
 from finestvx.legislation import (
     LegislativeIssue,
@@ -21,10 +22,10 @@ class TestLegislativeProtocolDataclasses:
         """Metadata accepts valid identifiers and rejects malformed values."""
         metadata = LegislativePackMetadata(
             pack_code="lv.standard.2026",
-            territory_code="lv",
+            territory_code=TerritoryCode("lv"),
             tax_year=2026,
             default_locale="lv-LV",
-            currencies=["eur"],
+            currencies=[CurrencyCode("eur")],
         )
 
         assert metadata.territory_code == "LV"
@@ -34,39 +35,39 @@ class TestLegislativeProtocolDataclasses:
         with pytest.raises(TypeError, match="pack_code must be str"):
             LegislativePackMetadata(
                 pack_code=cast("Any", 1),
-                territory_code="LV",
+                territory_code=TerritoryCode("LV"),
                 tax_year=2026,
                 default_locale="lv-LV",
-                currencies=("EUR",),
+                currencies=(CurrencyCode("EUR"),),
             )
         with pytest.raises(ValueError, match="territory_code must be a valid ISO 3166-1"):
             LegislativePackMetadata(
                 pack_code="lv.standard.2026",
-                territory_code="LVA",
+                territory_code=TerritoryCode("LVA"),
                 tax_year=2026,
                 default_locale="lv-LV",
-                currencies=("EUR",),
+                currencies=(CurrencyCode("EUR"),),
             )
         with pytest.raises(TypeError, match="tax_year must be int"):
             LegislativePackMetadata(
                 pack_code="lv.standard.2026",
-                territory_code="LV",
+                territory_code=TerritoryCode("LV"),
                 tax_year=True,
                 default_locale="lv-LV",
-                currencies=("EUR",),
+                currencies=(CurrencyCode("EUR"),),
             )
         with pytest.raises(ValueError, match="tax_year must be between 1 and 9999"):
             LegislativePackMetadata(
                 pack_code="lv.standard.2026",
-                territory_code="LV",
+                territory_code=TerritoryCode("LV"),
                 tax_year=10_000,
                 default_locale="lv-LV",
-                currencies=("EUR",),
+                currencies=(CurrencyCode("EUR"),),
             )
         with pytest.raises(ValueError, match="currencies must not be empty"):
             LegislativePackMetadata(
                 pack_code="lv.standard.2026",
-                territory_code="LV",
+                territory_code=TerritoryCode("LV"),
                 tax_year=2026,
                 default_locale="lv-LV",
                 currencies=(),
@@ -74,15 +75,15 @@ class TestLegislativeProtocolDataclasses:
         with pytest.raises(ValueError, match="invalid ISO 4217 code"):
             LegislativePackMetadata(
                 pack_code="lv.standard.2026",
-                territory_code="LV",
+                territory_code=TerritoryCode("LV"),
                 tax_year=2026,
                 default_locale="lv-LV",
-                currencies=("ZZZ1",),
+                currencies=(CurrencyCode("ZZZ1"),),
             )
-        with pytest.raises(TypeError, match="currencies must be a sequence"):
+        with pytest.raises(TypeError, match=r"currencies must be a Sequence"):
             LegislativePackMetadata(
                 pack_code="lv.standard.2026",
-                territory_code="LV",
+                territory_code=TerritoryCode("LV"),
                 tax_year=2026,
                 default_locale="lv-LV",
                 currencies=cast("Any", {"EUR"}),
@@ -90,10 +91,10 @@ class TestLegislativeProtocolDataclasses:
         with pytest.raises(ValueError, match="Invalid default_locale"):
             LegislativePackMetadata(
                 pack_code="lv.standard.2026",
-                territory_code="LV",
+                territory_code=TerritoryCode("LV"),
                 tax_year=2026,
                 default_locale="lv/LV",
-                currencies=("EUR",),
+                currencies=(CurrencyCode("EUR"),),
             )
 
     def test_issue_and_validation_result_enforce_shape(self) -> None:

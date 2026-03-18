@@ -6,6 +6,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 
 from ftllexengine import FiscalCalendar, FiscalPeriod, make_fluent_number
+from ftllexengine.introspection import CurrencyCode
 
 from finestvx.core.enums import FiscalPeriodState, PostingSide
 from finestvx.core.models import Account, Book, BookPeriod, JournalTransaction, LedgerEntry
@@ -35,14 +36,14 @@ def build_posted_transaction(
                 account_code="1000",
                 side=PostingSide.DEBIT,
                 amount=make_fluent_number(amount),
-                currency="EUR",
+                currency=CurrencyCode("EUR"),
                 tax_rate=tax_rate,
             ),
             LedgerEntry(
                 account_code="2000",
                 side=PostingSide.CREDIT,
                 amount=make_fluent_number(amount),
-                currency="EUR",
+                currency=CurrencyCode("EUR"),
                 tax_rate=tax_rate,
             ),
         ),
@@ -55,7 +56,7 @@ def build_sample_book(*, include_transaction: bool = False) -> Book:
     return Book(
         code="demo-book",
         name="Demo Book",
-        base_currency="EUR",
+        base_currency=CurrencyCode("EUR"),
         fiscal_calendar=FiscalCalendar(start_month=1),
         legislative_pack="lv.standard.2026",
         accounts=(
@@ -63,13 +64,13 @@ def build_sample_book(*, include_transaction: bool = False) -> Book:
                 code="1000",
                 name="Cash",
                 normal_side=PostingSide.DEBIT,
-                currency="EUR",
+                currency=CurrencyCode("EUR"),
             ),
             Account(
                 code="2000",
                 name="Revenue",
                 normal_side=PostingSide.CREDIT,
-                currency="EUR",
+                currency=CurrencyCode("EUR"),
             ),
         ),
         periods=(

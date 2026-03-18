@@ -10,6 +10,7 @@ from typing import Any, cast
 import pytest
 from ftllexengine import make_fluent_number
 from ftllexengine.diagnostics import WarningSeverity
+from ftllexengine.introspection import CurrencyCode
 
 import finestvx.validation.service as validation_module
 from finestvx.core import Account, JournalTransaction, LedgerEntry, PostingSide, TransactionState
@@ -46,7 +47,7 @@ class TestValidationServiceEdges:
             code="1000",
             name="Cash",
             normal_side=PostingSide.DEBIT,
-            currency="EUR",
+            currency=CurrencyCode("EUR"),
         )
         partial_book = SimpleNamespace(
             accounts=(account,),
@@ -73,7 +74,7 @@ class TestValidationServiceEdges:
                     account_code="1000",
                     side=PostingSide.DEBIT,
                     amount=make_fluent_number(Decimal("10.00")),
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
             ),
         )
@@ -93,7 +94,7 @@ class TestValidationServiceEdges:
                     code="1000",
                     name="Cash",
                     normal_side=PostingSide.DEBIT,
-                    currency="EUR",
+                    currency=CurrencyCode("EUR"),
                 ),
             )
         )

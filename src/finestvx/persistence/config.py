@@ -59,13 +59,16 @@ class PersistenceConfig:
         self._normalize_paths()
         self._validate_numeric_fields()
         self._validate_transaction_mode()
-        self._validate_vfs_name()
 
     def _normalize_paths(self) -> None:
         """Normalize filesystem-bound configuration fields."""
         object.__setattr__(self, "database_path", Path(self.database_path))
         if self.vfs_name is not None:
-            object.__setattr__(self, "vfs_name", self.vfs_name.strip())
+            object.__setattr__(
+                self,
+                "vfs_name",
+                require_non_empty_str(self.vfs_name, "vfs_name"),
+            )
 
     def _validate_numeric_fields(self) -> None:
         """Validate numeric persistence settings."""
@@ -96,12 +99,6 @@ class PersistenceConfig:
                 "transaction_mode must be one of "
                 f"{sorted(allowed_modes)}, got {self.transaction_mode}"
             )
-            raise ValueError(msg)
-
-    def _validate_vfs_name(self) -> None:
-        """Validate the optional SQLite VFS name."""
-        if self.vfs_name is not None and not self.vfs_name:
-            msg = "vfs_name must not be blank"
             raise ValueError(msg)
 
 

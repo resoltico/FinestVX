@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 
 import pytest
 from ftllexengine import FluentNumber
+from ftllexengine.introspection import CurrencyCode
 from hypothesis import event, given
 
 from finestvx.core import JournalTransaction, LedgerEntry, PostingSide
@@ -40,13 +41,13 @@ class TestJournalTransactionProperties:
                     account_code="1000",
                     side=PostingSide.DEBIT,
                     amount=amount,
-                    currency=currency,
+                    currency=CurrencyCode(currency),
                 ),
                 LedgerEntry(
                     account_code="2000",
                     side=PostingSide.CREDIT,
                     amount=amount,
-                    currency=currency,
+                    currency=CurrencyCode(currency),
                 ),
             ),
         )
@@ -54,6 +55,6 @@ class TestJournalTransactionProperties:
         event(f"outcome=balanced_{transaction.is_balanced}")
         assert transaction.is_balanced is True
         assert (
-            transaction.debits_by_currency()[currency]
-            == transaction.credits_by_currency()[currency]
+            transaction.debits_by_currency()[CurrencyCode(currency)]
+            == transaction.credits_by_currency()[CurrencyCode(currency)]
         )

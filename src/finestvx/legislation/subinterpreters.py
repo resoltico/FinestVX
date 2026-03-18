@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, cast
 
-from ftllexengine import InterpreterPool
+from ftllexengine import InterpreterPool, require_positive_int
 
 from .protocols import LegislativeIssue, LegislativeValidationResult
 from .registry import create_default_pack_registry
@@ -55,7 +55,11 @@ class LegislativeInterpreterRunner:
     _pool: InterpreterPool = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        """Initialize the interpreter pool."""
+        """Validate pool bounds and initialize the interpreter pool."""
+        require_positive_int(self.pool_min_size, "pool_min_size")
+        if self.pool_max_size < self.pool_min_size:
+            msg = "pool_max_size must be >= pool_min_size"
+            raise ValueError(msg)
         self._pool = InterpreterPool(
             min_size=self.pool_min_size,
             max_size=self.pool_max_size,
