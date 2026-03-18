@@ -110,9 +110,9 @@ class TestSerializationHelpers:
         with pytest.raises(TypeError, match="entries must be a sequence"):
             serialization_module._require_sequence("bad", "entries")
         with pytest.raises(TypeError, match="name must be str"):
-            validators_module.require_non_empty_text(1, "name")
-        with pytest.raises(ValueError, match="name must not be empty"):
-            validators_module.require_non_empty_text("  ", "name")
+            validators_module.normalize_optional_text(1, "name")
+        with pytest.raises(ValueError, match="name cannot be blank"):
+            validators_module.normalize_optional_text("  ", "name")
         with pytest.raises(TypeError, match="start_date must be ISO date text"):
             serialization_module._require_date(1, "start_date")
         with pytest.raises(TypeError, match="posted_at must be ISO datetime text"):

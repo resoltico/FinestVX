@@ -8,6 +8,7 @@ from queue import Empty, Queue
 from threading import Event, Thread
 from typing import TYPE_CHECKING, cast
 
+from ftllexengine import require_positive_int
 from ftllexengine.runtime import RWLock
 
 from finestvx.persistence import DatabaseSnapshot, SqliteLedgerStore, StoreWriteReceipt
@@ -52,9 +53,10 @@ class RuntimeConfig:
         if self.poll_interval <= 0:
             msg = "poll_interval must be positive"
             raise ValueError(msg)
-        if self.legislative_interpreter_pool_min_size < 1:
-            msg = "legislative_interpreter_pool_min_size must be >= 1"
-            raise ValueError(msg)
+        require_positive_int(
+            self.legislative_interpreter_pool_min_size,
+            "legislative_interpreter_pool_min_size",
+        )
         if self.legislative_interpreter_pool_max_size < self.legislative_interpreter_pool_min_size:
             msg = (
                 "legislative_interpreter_pool_max_size must be >= "

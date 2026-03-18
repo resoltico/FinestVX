@@ -1,8 +1,8 @@
 ---
 afad: "3.3"
-version: "0.7.0"
+version: "0.8.0"
 domain: CHANGELOG
-updated: "2026-03-17"
+updated: "2026-03-18"
 route:
   keywords: [changelog, release notes, version history, breaking changes, migration, fixed, what's new]
   questions: ["what changed in version X?", "what are the breaking changes?", "what was fixed in the latest release?", "what is the release history?"]
@@ -14,6 +14,51 @@ Notable changes to this project are documented in this file. The format is based
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.8.0] - 2026-03-18
+
+### Breaking Changes
+
+- **`LegislativeValidationResult.require_valid()` now raises `IntegrityCheckFailedError`
+  instead of `ValueError`** — aligns with the FTLLexEngine integrity exception hierarchy;
+  callers catching `ValueError` must be updated to catch `IntegrityCheckFailedError` (from
+  `ftllexengine.integrity`) or `DataIntegrityError` for the full family
+- **Blank-string error messages changed** — all text field validators now use FTLLexEngine
+  `require_non_empty_str`; the error message for a blank value changed from
+  `"<field> must not be empty"` to `"<field> cannot be blank"` across `AuditContext`,
+  `LegislativeIssue`, `LegislativePackMetadata`, `LegislativeValidationResult`, and
+  `LegislativePackRegistry.resolve()`; tests and callers matching the old message must be
+  updated
+- **`RuntimeConfig.legislative_interpreter_pool_min_size` error message changed** — now
+  `"legislative_interpreter_pool_min_size must be positive"` (from `require_positive_int`);
+  previously `"must be >= 1"`
+
+### Added
+
+- **`FinestVXService` implements the context-manager protocol** — `with FinestVXService(...) as
+  svc:` now closes the runtime and interpreter pool on exit; removes the need for explicit
+  `try/finally` blocks around `svc.close()`
+
+### Refactored
+
+- **`_coerce_tuple[T]` consolidated into `finestvx.core._validators`** — eliminates
+  within-FinestVX duplication between `core/models.py` and `legislation/protocols.py`; the
+  unified version accepts any `Sequence` (not just `list | tuple`), enabling callers to pass
+  any ordered iterable
+- **`require_non_empty_text` private helper eliminated from `finestvx.core._validators`** —
+  replaced by `ftllexengine.require_non_empty_str` (FTLLexEngine v0.157.0) throughout all
+  FinestVX modules; removes FinestVX's private reimplementation of a cross-cutting primitive
+- **`require_positive_int` from FTLLexEngine replaces inline guards** — `PersistenceConfig`
+  (`busy_timeout_ms`, `wal_auto_checkpoint`, `reader_connection_count`) and `RuntimeConfig`
+  (`legislative_interpreter_pool_min_size`) now delegate to `ftllexengine.require_positive_int`
+- **`_normalize_pack_code` removed from `legislation/registry.py`** — replaced by
+  `ftllexengine.require_non_empty_str`; the two implementations were semantically identical
+- **Root facade imports consolidated** — `require_locale_code`, `LocalizationBootConfig`,
+  `LoadSummary`, and `FluentLocalization` now imported from `ftllexengine` directly instead
+  of `ftllexengine.localization` / `ftllexengine.core.locale_utils` submodule paths
+- **`AuditContext.__post_init__` now normalizes and stores stripped values** — previously
+  validated but stored the original (potentially whitespace-padded) strings; now stores the
+  stripped result returned by `require_non_empty_str`
 
 ## [0.7.0] - 2026-03-18
 

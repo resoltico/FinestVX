@@ -30,8 +30,9 @@ from finestvx.validation.service import report_from_legislative_result
 
 if TYPE_CHECKING:
     from pathlib import Path
+    from typing import Self
 
-    from ftllexengine.localization import FluentLocalization, LoadSummary
+    from ftllexengine import FluentLocalization, LoadSummary
 
     from finestvx.core.models import Book, JournalTransaction
     from finestvx.legislation import LegislativeValidationResult
@@ -97,6 +98,14 @@ class FinestVXService:
         """Close runtime resources and interpreter pool held by the service."""
         self._runtime.close()
         self.interpreter_runner.close()
+
+    def __enter__(self) -> Self:
+        """Enter context-manager scope."""
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
+        """Close the service at the end of a context-manager scope."""
+        self.close()
 
     def create_book(self, book: Book, *, audit_context: AuditContext) -> StoreWriteReceipt:
         """Persist a new book."""

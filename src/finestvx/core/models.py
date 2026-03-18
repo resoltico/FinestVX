@@ -3,24 +3,25 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 from decimal import Decimal
 from itertools import pairwise
 from typing import TYPE_CHECKING, Final
 
-from ftllexengine import FiscalCalendar, FiscalPeriod, FluentNumber
+from ftllexengine import FiscalCalendar, FiscalPeriod, FluentNumber, require_non_empty_str
 from ftllexengine.introspection import (
     CurrencyCode,
     get_currency_decimal_digits,
     is_valid_currency_code,
 )
 
-from ._validators import normalize_optional_text, require_non_empty_text
+from ._validators import _coerce_tuple, normalize_optional_text
 from .enums import FiscalPeriodState, PostingSide, TransactionState
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from .types import AccountCode, BookCode, LegislativePackCode, TransactionReference
 
 __all__ = [
@@ -41,7 +42,7 @@ def _is_known_currency_code(value: str) -> bool:
 
 def _normalize_currency(value: object, field_name: str) -> CurrencyCode:
     """Validate and normalize an ISO 4217 currency code."""
-    normalized = require_non_empty_text(value, field_name).upper()
+    normalized = require_non_empty_str(value, field_name).upper()
     if not _is_known_currency_code(normalized):
         msg = f"{field_name} must be a valid ISO 4217 currency code, got {value!r}"
         raise ValueError(msg)
@@ -65,16 +66,6 @@ def _require_decimal_ratio(value: object, field_name: str) -> Decimal | None:
         msg = f"{field_name} must be between 0 and 1 inclusive"
         raise ValueError(msg)
     return value
-
-
-def _coerce_tuple[T](value: object, field_name: str) -> tuple[T, ...]:
-    """Accept any sequence input and normalize to tuple storage."""
-    if isinstance(value, tuple):
-        return value
-    if isinstance(value, (list, Sequence)) and not isinstance(value, str):
-        return tuple(value)
-    msg = f"{field_name} must be a sequence, got {type(value).__name__}"
-    raise TypeError(msg)
 
 
 def _require_fluent_number(value: object, field_name: str) -> FluentNumber:
@@ -315,8 +306,8 @@ class Account:
 
     def __post_init__(self) -> None:
         """Validate and normalize account fields."""
-        object.__setattr__(self, "code", require_non_empty_text(self.code, "code"))
-        object.__setattr__(self, "name", require_non_empty_text(self.name, "name"))
+        object.__setattr__(self, "code", require_non_empty_str(self.code, "code"))
+        object.__setattr__(self, "name", require_non_empty_str(self.name, "name"))
         object.__setattr__(self, "currency", _normalize_currency(self.currency, "currency"))
         object.__setattr__(
             self,
@@ -373,7 +364,7 @@ class LedgerEntry:
         object.__setattr__(
             self,
             "account_code",
-            require_non_empty_text(self.account_code, "account_code"),
+            require_non_empty_str(self.account_code, "account_code"),
         )
         object.__setattr__(self, "side", _require_posting_side(self.side, "side"))
         object.__setattr__(self, "amount", _require_fluent_number(self.amount, "amount"))
@@ -431,7 +422,7 @@ class JournalTransaction:
         object.__setattr__(
             self,
             "reference",
-            require_non_empty_text(self.reference, "reference"),
+            require_non_empty_str(self.reference, "reference"),
         )
         object.__setattr__(
             self,
@@ -441,7 +432,7 @@ class JournalTransaction:
         object.__setattr__(
             self,
             "description",
-            require_non_empty_text(self.description, "description"),
+            require_non_empty_str(self.description, "description"),
         )
         object.__setattr__(self, "entries", _coerce_tuple(self.entries, "entries"))
         if self.period is not None:
@@ -508,8 +499,8 @@ class Book:
 
     def __post_init__(self) -> None:
         """Validate and normalize aggregate invariants."""
-        object.__setattr__(self, "code", require_non_empty_text(self.code, "code"))
-        object.__setattr__(self, "name", require_non_empty_text(self.name, "name"))
+        object.__setattr__(self, "code", require_non_empty_str(self.code, "code"))
+        object.__setattr__(self, "name", require_non_empty_str(self.name, "name"))
         object.__setattr__(
             self,
             "base_currency",
@@ -523,7 +514,7 @@ class Book:
         object.__setattr__(
             self,
             "legislative_pack",
-            require_non_empty_text(self.legislative_pack, "legislative_pack"),
+            require_non_empty_str(self.legislative_pack, "legislative_pack"),
         )
         object.__setattr__(self, "accounts", _coerce_tuple(self.accounts, "accounts"))
         object.__setattr__(self, "periods", _coerce_tuple(self.periods, "periods"))

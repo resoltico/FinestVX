@@ -8,8 +8,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from ftllexengine import FluentNumber, make_fluent_number
-from ftllexengine.localization import LocalizationBootConfig
+from ftllexengine import FluentNumber, LocalizationBootConfig, make_fluent_number
 from ftllexengine.runtime import FunctionRegistry, fluent_function, get_shared_registry
 
 from finestvx.legislation.protocols import (

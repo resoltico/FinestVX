@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ftllexengine import CacheConfig
+from ftllexengine import CacheConfig, require_non_empty_str, require_positive_int
 
 __all__ = [
     "MANDATED_CACHE_CONFIG",
@@ -32,13 +32,9 @@ class AuditContext:
     session_id: str | None = None
 
     def __post_init__(self) -> None:
-        """Validate that actor and reason are non-empty."""
-        if not self.actor.strip():
-            msg = "actor must not be empty"
-            raise ValueError(msg)
-        if not self.reason.strip():
-            msg = "reason must not be empty"
-            raise ValueError(msg)
+        """Normalize and validate actor and reason."""
+        object.__setattr__(self, "actor", require_non_empty_str(self.actor, "actor"))
+        object.__setattr__(self, "reason", require_non_empty_str(self.reason, "reason"))
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,15 +69,9 @@ class PersistenceConfig:
 
     def _validate_numeric_fields(self) -> None:
         """Validate numeric persistence settings."""
-        if self.busy_timeout_ms <= 0:
-            msg = "busy_timeout_ms must be positive"
-            raise ValueError(msg)
-        if self.wal_auto_checkpoint <= 0:
-            msg = "wal_auto_checkpoint must be positive"
-            raise ValueError(msg)
-        if self.reader_connection_count <= 0:
-            msg = "reader_connection_count must be positive"
-            raise ValueError(msg)
+        require_positive_int(self.busy_timeout_ms, "busy_timeout_ms")
+        require_positive_int(self.wal_auto_checkpoint, "wal_auto_checkpoint")
+        require_positive_int(self.reader_connection_count, "reader_connection_count")
         if self.reader_checkout_timeout <= 0:
             msg = "reader_checkout_timeout must be positive"
             raise ValueError(msg)

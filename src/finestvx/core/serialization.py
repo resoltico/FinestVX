@@ -6,9 +6,9 @@ from collections.abc import Mapping, Sequence
 from datetime import date, datetime
 from decimal import Decimal
 
-from ftllexengine import FiscalCalendar, FiscalPeriod, make_fluent_number
+from ftllexengine import FiscalCalendar, FiscalPeriod, make_fluent_number, require_non_empty_str
 
-from ._validators import normalize_optional_text, require_non_empty_text
+from ._validators import normalize_optional_text
 from .enums import FiscalPeriodState, PostingSide, TransactionState
 from .models import Account, Book, BookPeriod, JournalTransaction, LedgerEntry
 
@@ -105,10 +105,10 @@ def _entry_from_mapping(payload: object) -> LedgerEntry:
     amount = _require_decimal(data["amount"], "entry.amount")
     tax_rate = data.get("tax_rate")
     return LedgerEntry(
-        account_code=require_non_empty_text(data["account_code"], "entry.account_code"),
-        side=PostingSide(require_non_empty_text(data["side"], "entry.side")),
+        account_code=require_non_empty_str(data["account_code"], "entry.account_code"),
+        side=PostingSide(require_non_empty_str(data["side"], "entry.side")),
         amount=make_fluent_number(amount),
-        currency=require_non_empty_text(data["currency"], "entry.currency"),
+        currency=require_non_empty_str(data["currency"], "entry.currency"),
         description=normalize_optional_text(data.get("description"), "entry.description"),
         tax_rate=None if tax_rate is None else _require_decimal(tax_rate, "entry.tax_rate"),
     )
@@ -132,15 +132,15 @@ def transaction_from_mapping(payload: object) -> JournalTransaction:
     data = _require_mapping(payload, "transaction")
     period = data.get("period")
     return JournalTransaction(
-        reference=require_non_empty_text(data["reference"], "transaction.reference"),
+        reference=require_non_empty_str(data["reference"], "transaction.reference"),
         posted_at=_require_datetime(data["posted_at"], "transaction.posted_at"),
-        description=require_non_empty_text(data["description"], "transaction.description"),
+        description=require_non_empty_str(data["description"], "transaction.description"),
         entries=tuple(
             _entry_from_mapping(item)
             for item in _require_sequence(data["entries"], "transaction.entries")
         ),
         period=None if period is None else _period_from_mapping(period, "transaction.period"),
-        state=TransactionState(require_non_empty_text(data["state"], "transaction.state")),
+        state=TransactionState(require_non_empty_str(data["state"], "transaction.state")),
         reversal_of=normalize_optional_text(data.get("reversal_of"), "transaction.reversal_of"),
     )
 
@@ -162,10 +162,10 @@ def _account_from_mapping(payload: object) -> Account:
     """Deserialize an account."""
     data = _require_mapping(payload, "account")
     return Account(
-        code=require_non_empty_text(data["code"], "account.code"),
-        name=require_non_empty_text(data["name"], "account.name"),
-        normal_side=PostingSide(require_non_empty_text(data["normal_side"], "account.normal_side")),
-        currency=require_non_empty_text(data["currency"], "account.currency"),
+        code=require_non_empty_str(data["code"], "account.code"),
+        name=require_non_empty_str(data["name"], "account.name"),
+        normal_side=PostingSide(require_non_empty_str(data["normal_side"], "account.normal_side")),
+        currency=require_non_empty_str(data["currency"], "account.currency"),
         parent_code=normalize_optional_text(data.get("parent_code"), "account.parent_code"),
         allow_posting=bool(data.get("allow_posting", True)),
         active=bool(data.get("active", True)),
@@ -189,7 +189,7 @@ def _book_period_from_mapping(payload: object) -> BookPeriod:
         period=_period_from_mapping(data["period"], "book_period.period"),
         start_date=_require_date(data["start_date"], "book_period.start_date"),
         end_date=_require_date(data["end_date"], "book_period.end_date"),
-        state=FiscalPeriodState(require_non_empty_text(data["state"], "book_period.state")),
+        state=FiscalPeriodState(require_non_empty_str(data["state"], "book_period.state")),
     )
 
 
@@ -212,16 +212,16 @@ def book_from_mapping(payload: object) -> Book:
     data = _require_mapping(payload, "book")
     fiscal_calendar = _require_mapping(data["fiscal_calendar"], "book.fiscal_calendar")
     return Book(
-        code=require_non_empty_text(data["code"], "book.code"),
-        name=require_non_empty_text(data["name"], "book.name"),
-        base_currency=require_non_empty_text(data["base_currency"], "book.base_currency"),
+        code=require_non_empty_str(data["code"], "book.code"),
+        name=require_non_empty_str(data["name"], "book.name"),
+        base_currency=require_non_empty_str(data["base_currency"], "book.base_currency"),
         fiscal_calendar=FiscalCalendar(
             start_month=_require_int(
                 fiscal_calendar["start_month"],
                 "book.fiscal_calendar.start_month",
             )
         ),
-        legislative_pack=require_non_empty_text(data["legislative_pack"], "book.legislative_pack"),
+        legislative_pack=require_non_empty_str(data["legislative_pack"], "book.legislative_pack"),
         accounts=tuple(
             _account_from_mapping(item)
             for item in _require_sequence(data["accounts"], "book.accounts")

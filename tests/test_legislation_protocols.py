@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, cast
 
 import pytest
+from ftllexengine.integrity import IntegrityCheckFailedError
 
 from finestvx.legislation import (
     LegislativeIssue,
@@ -78,7 +79,7 @@ class TestLegislativeProtocolDataclasses:
                 default_locale="lv-LV",
                 currencies=("ZZZ1",),
             )
-        with pytest.raises(TypeError, match="currencies must be tuple or list"):
+        with pytest.raises(TypeError, match="currencies must be a sequence"):
             LegislativePackMetadata(
                 pack_code="lv.standard.2026",
                 territory_code="LV",
@@ -101,7 +102,7 @@ class TestLegislativeProtocolDataclasses:
         result = LegislativeValidationResult("lv.standard.2026", [issue])
 
         assert result.accepted is False
-        with pytest.raises(ValueError, match="VAT_MISMATCH"):
+        with pytest.raises(IntegrityCheckFailedError, match="VAT_MISMATCH"):
             result.require_valid()
 
         accepted_result = LegislativeValidationResult("lv.standard.2026")
@@ -110,7 +111,7 @@ class TestLegislativeProtocolDataclasses:
 
         with pytest.raises(TypeError, match="code must be str"):
             LegislativeIssue(code=cast("Any", 1), message="Wrong rate")
-        with pytest.raises(ValueError, match="message must not be empty"):
+        with pytest.raises(ValueError, match="message cannot be blank"):
             LegislativeIssue(code="VAT_MISMATCH", message=" ")
         with pytest.raises(TypeError, match="entry_index must be int"):
             LegislativeIssue(code="VAT_MISMATCH", message="Wrong rate", entry_index=True)

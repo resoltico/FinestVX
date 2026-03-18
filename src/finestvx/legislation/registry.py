@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from ftllexengine import require_non_empty_str
+
 from .lv.standard_2026 import LatviaStandard2026Pack
 
 if TYPE_CHECKING:
@@ -19,18 +21,6 @@ __all__ = [
 ]
 
 
-def _normalize_pack_code(pack_code: object) -> LegislativePackCode:
-    """Validate and normalize a legislative-pack code."""
-    if not isinstance(pack_code, str):
-        msg = f"pack_code must be str, got {type(pack_code).__name__}"
-        raise TypeError(msg)
-    normalized = pack_code.strip()
-    if not normalized:
-        msg = "pack_code must not be empty"
-        raise ValueError(msg)
-    return normalized
-
-
 class LegislativePackRegistry:
     """Mutable registry for resolving legislative-pack implementations."""
 
@@ -44,7 +34,7 @@ class LegislativePackRegistry:
 
     def register(self, pack: ILegislativePack) -> None:
         """Register a legislative pack under its metadata code."""
-        pack_code = _normalize_pack_code(pack.metadata.pack_code)
+        pack_code = require_non_empty_str(pack.metadata.pack_code, "pack_code")
         if pack_code in self._packs:
             msg = f"Legislative pack already registered: {pack_code}"
             raise ValueError(msg)
@@ -52,7 +42,7 @@ class LegislativePackRegistry:
 
     def resolve(self, pack_code: LegislativePackCode) -> ILegislativePack:
         """Resolve a legislative pack or raise ``KeyError``."""
-        normalized = _normalize_pack_code(pack_code)
+        normalized = require_non_empty_str(pack_code, "pack_code")
         try:
             return self._packs[normalized]
         except KeyError as error:

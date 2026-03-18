@@ -2,7 +2,7 @@
 afad: "3.3"
 version: "0.7.0"
 domain: SECONDARY
-updated: "2026-03-17"
+updated: "2026-03-18"
 route:
   keywords: [legislative pack, pack protocol, pack registry, pack metadata, legislative issue, legislative result, subinterpreters, latvia 2026, function registry isolation, localization boot config, configure localization, interpreter pool]
   questions: ["how does the finestvx plugin system work?", "what is an ILegislativePack?", "how are packs isolated at runtime?", "how is the Latvia pack implemented?", "how do i add a jurisdiction pack?"]
@@ -76,7 +76,7 @@ class LegislativeValidationResult:
 ### Constraints
 - `pack_code` must be non-empty; `issues` are stored as tuple.
 - `accepted`: `True` when `issues` is empty.
-- `require_valid`: raises `ValueError` when `not accepted`.
+- `require_valid`: raises `ftllexengine.integrity.IntegrityCheckFailedError` when `not accepted`.
 
 ---
 

@@ -23,9 +23,9 @@ class TestCoreModelHelpers:
     def test_text_ratio_and_tuple_helpers_reject_invalid_values(self) -> None:
         """Primitive validators reject invalid scalar inputs with clear errors."""
         with pytest.raises(TypeError, match="field must be str"):
-            validators_module.require_non_empty_text(1, "field")
-        with pytest.raises(ValueError, match="field must not be empty"):
-            validators_module.require_non_empty_text("   ", "field")
+            validators_module.normalize_optional_text(1, "field")
+        with pytest.raises(ValueError, match="field cannot be blank"):
+            validators_module.normalize_optional_text("   ", "field")
         assert validators_module.normalize_optional_text(None, "field") is None
         assert validators_module.normalize_optional_text(" value ", "field") == "value"
 

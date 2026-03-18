@@ -2,7 +2,7 @@
 afad: "3.3"
 version: "0.7.0"
 domain: SECONDARY
-updated: "2026-03-17"
+updated: "2026-03-18"
 route:
   keywords: [export artifact, ledger exporter, runtime config, ledger runtime, posted transaction result, service facade, gateway debug snapshot, runtime debug snapshot, interpreter pool, clear caches, localization boot]
   questions: ["how does LedgerRuntime work now?", "what does FinestVXService return on writes?", "what runtime debug data is available?", "how are artifacts exported?", "what is PostedTransactionResult?"]
@@ -203,6 +203,8 @@ class FinestVXService:
     exporter: LedgerExporter  # default_factory=LedgerExporter
     interpreter_runner: LegislativeInterpreterRunner  # init=False; constructed from config pool-size settings
 
+    def __enter__(self) -> FinestVXService: ...
+    def __exit__(self, *args: object) -> None: ...
     def close(self) -> None: ...
     def create_book(self, book: Book, *, audit_context: AuditContext) -> StoreWriteReceipt: ...
     def post_transaction(self, book_code: str, transaction: JournalTransaction, *, audit_context: AuditContext) -> PostedTransactionResult: ...
@@ -228,3 +230,4 @@ class FinestVXService:
 - `clear_caches(components=None)` forwards to `ftllexengine.clear_module_caches(components=components)`;
   pass a `frozenset[str]` of component names (e.g., `frozenset({"introspection.iso"})`) to clear selectively.
 - `close()` must be called to release runtime and interpreter pool resources.
+- Implements the context-manager protocol: `with FinestVXService(...) as svc:` calls `close()` on exit; prefer this over explicit `try/finally`.

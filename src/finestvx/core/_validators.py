@@ -11,31 +11,32 @@ public API.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
+from ftllexengine import require_non_empty_str
+
 __all__: list[str] = []
 
 
-def require_non_empty_text(value: object, field_name: str) -> str:
-    """Validate and normalize a required text field.
+def _coerce_tuple[T](value: object, field_name: str) -> tuple[T, ...]:
+    """Accept any sequence input and normalize to immutable tuple storage.
 
     Args:
-        value: Candidate text value.
+        value: Candidate sequence value (tuple, list, or any Sequence except str).
         field_name: Field name for diagnostics.
 
     Returns:
-        Stripped text value.
+        Immutable tuple containing the original elements.
 
     Raises:
-        TypeError: If the value is not a string.
-        ValueError: If the value is empty after trimming.
+        TypeError: If the value is a string or a non-Sequence type.
     """
-    if not isinstance(value, str):
-        msg = f"{field_name} must be str, got {type(value).__name__}"
-        raise TypeError(msg)
-    normalized = value.strip()
-    if not normalized:
-        msg = f"{field_name} must not be empty"
-        raise ValueError(msg)
-    return normalized
+    if isinstance(value, tuple):
+        return value
+    if isinstance(value, Sequence) and not isinstance(value, str):
+        return tuple(value)
+    msg = f"{field_name} must be a sequence, got {type(value).__name__}"
+    raise TypeError(msg)
 
 
 def normalize_optional_text(value: object, field_name: str) -> str | None:
@@ -54,4 +55,4 @@ def normalize_optional_text(value: object, field_name: str) -> str | None:
     """
     if value is None:
         return None
-    return require_non_empty_text(value, field_name)
+    return require_non_empty_str(value, field_name)

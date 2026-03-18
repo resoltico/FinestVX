@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
-from ftllexengine.core.locale_utils import require_locale_code
+from ftllexengine import require_locale_code, require_non_empty_str
+from ftllexengine.integrity import IntegrityCheckFailedError, IntegrityContext
 from ftllexengine.introspection import is_valid_currency_code, is_valid_territory_code
 
-from finestvx.core._validators import require_non_empty_text
+from finestvx.core._validators import _coerce_tuple
 
 if TYPE_CHECKING:
+    from ftllexengine import FluentLocalization, LocalizationBootConfig
     from ftllexengine.introspection import CurrencyCode, TerritoryCode
-    from ftllexengine.localization import FluentLocalization, LocalizationBootConfig
     from ftllexengine.runtime import FunctionRegistry
 
     from finestvx.core.models import Book, JournalTransaction
@@ -58,16 +60,6 @@ def _require_non_negative_int(value: object, field_name: str) -> int:
     return value
 
 
-def _coerce_tuple[T](value: object, field_name: str) -> tuple[T, ...]:
-    """Accept list or tuple input and normalize to tuple storage."""
-    if isinstance(value, tuple):
-        return value
-    if isinstance(value, list):
-        return tuple(value)
-    msg = f"{field_name} must be tuple or list, got {type(value).__name__}"
-    raise TypeError(msg)
-
-
 @dataclass(frozen=True, slots=True)
 class LegislativePackMetadata:
     """Static metadata describing a legislative pack implementation."""
@@ -83,9 +75,9 @@ class LegislativePackMetadata:
         object.__setattr__(
             self,
             "pack_code",
-            require_non_empty_text(self.pack_code, "pack_code"),
+            require_non_empty_str(self.pack_code, "pack_code"),
         )
-        territory_code = require_non_empty_text(self.territory_code, "territory_code").upper()
+        territory_code = require_non_empty_str(self.territory_code, "territory_code").upper()
         if not _is_known_territory_code(territory_code):
             msg = f"territory_code must be a valid ISO 3166-1 alpha-2 code, got {territory_code!r}"
             raise ValueError(msg)
@@ -101,7 +93,7 @@ class LegislativePackMetadata:
             msg = "currencies must not be empty"
             raise ValueError(msg)
         normalized_currencies = tuple(
-            require_non_empty_text(currency, "currencies").upper()
+            require_non_empty_str(currency, "currencies").upper()
             for currency in self.currencies
         )
         for currency in normalized_currencies:
@@ -121,8 +113,8 @@ class LegislativeIssue:
 
     def __post_init__(self) -> None:
         """Validate issue payload structure."""
-        object.__setattr__(self, "code", require_non_empty_text(self.code, "code"))
-        object.__setattr__(self, "message", require_non_empty_text(self.message, "message"))
+        object.__setattr__(self, "code", require_non_empty_str(self.code, "code"))
+        object.__setattr__(self, "message", require_non_empty_str(self.message, "message"))
         if self.entry_index is None:
             return
         object.__setattr__(
@@ -144,7 +136,7 @@ class LegislativeValidationResult:
         object.__setattr__(
             self,
             "pack_code",
-            require_non_empty_text(self.pack_code, "pack_code"),
+            require_non_empty_str(self.pack_code, "pack_code"),
         )
         object.__setattr__(self, "issues", _coerce_tuple(self.issues, "issues"))
 
@@ -154,12 +146,18 @@ class LegislativeValidationResult:
         return len(self.issues) == 0
 
     def require_valid(self) -> None:
-        """Raise ``ValueError`` when legislative validation produced issues."""
+        """Raise ``IntegrityCheckFailedError`` when legislative validation produced issues."""
         if self.accepted:
             return
         issue_codes = ", ".join(issue.code for issue in self.issues)
+        context = IntegrityContext(
+            component=f"legislation.{self.pack_code}",
+            operation="require_valid",
+            timestamp=time.monotonic(),
+            wall_time_unix=time.time(),
+        )
         msg = f"Legislative validation failed for {self.pack_code}: {issue_codes}"
-        raise ValueError(msg)
+        raise IntegrityCheckFailedError(msg, context=context)
 
 
 class ILegislativePack(Protocol):

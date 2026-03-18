@@ -266,7 +266,7 @@ wheels = [
 
 [[package]]
 name = "finestvx"
-version = "0.7.0"
+version = "0.8.0"
 source = { editable = "." }
 dependencies = [
     { name = "apsw" },
@@ -294,7 +294,7 @@ release = [
 [package.metadata]
 requires-dist = [
     { name = "apsw", specifier = ">=3.51.3.0" },
-    { name = "ftllexengine", extras = ["babel"], specifier = ">=0.156.0" },
+    { name = "ftllexengine", extras = ["babel"], specifier = ">=0.157.0" },
     { name = "lxml", specifier = ">=6.0.2,<7.0.0" },
     { name = "reportlab", specifier = ">=4.4.10,<5.0.0" },
 ]
@@ -315,11 +315,11 @@ release = [{ name = "twine", specifier = ">=6.2.0" }]
 
 [[package]]
 name = "ftllexengine"
-version = "0.156.0"
+version = "0.157.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/95/84/4a83b733f5f6df9abea2aefacb37bf41fb24037ab5be0297ddfb5a100269/ftllexengine-0.156.0.tar.gz", hash = "sha256:2a4c17c9b6b3a079cc9099d63207fb425b78b8dbeaca628168a16cefcca2fc54", size = 1466306, upload-time = "2026-03-17T10:10:46.063Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/67/61/ea313e18f65ee1d25afff621f3eb90dd9d5c6cde3fa1b2443800b18de687/ftllexengine-0.157.0.tar.gz", hash = "sha256:45de4859e94f369372c80bf4f9f1839612b68869eb38a2b2e3276499cbb839ed", size = 1499680, upload-time = "2026-03-18T09:36:35.248Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c6/65/13dd4189a279576872617c16f89dca312b0b1b3c1788577ca985632dd87d/ftllexengine-0.156.0-py3-none-any.whl", hash = "sha256:5688f21d4797a2d4e85b1b1c0147c2552c939e3e10ff4acd26bd9fa280873f96", size = 363495, upload-time = "2026-03-17T10:10:44.123Z" },
+    { url = "https://files.pythonhosted.org/packages/f2/93/8ffc672ed57f5fe2ae63ba981da4d563c2cd7a1c9a7c28d047b618c8e599/ftllexengine-0.157.0-py3-none-any.whl", hash = "sha256:9892e63ada0362af0f9f1a0106647273c02a3fca5ec745b0ea3ada5173a60972", size = 374096, upload-time = "2026-03-18T09:36:33.258Z" },
 ]
 
 [package.optional-dependencies]

@@ -15,7 +15,6 @@ import finestvx
 import finestvx.persistence as persistence_module
 from finestvx import JournalTransaction, LedgerEntry, PostingSide, TransactionState
 from finestvx.gateway import FinestVXService, FinestVXServiceConfig
-from finestvx.legislation.registry import _normalize_pack_code
 from finestvx.legislation.subinterpreters import _validate_in_subinterpreter
 from finestvx.persistence import AuditContext, PersistenceConfig, SqliteLedgerStore
 from finestvx.persistence.backup import create_snapshot as create_snapshot_wrapper
@@ -41,9 +40,9 @@ class TestPersistenceAndRuntimeEdges:
 
     def test_audit_context_and_persistence_config_validation(self, tmp_path: Path) -> None:
         """Configuration dataclasses reject invalid values."""
-        with pytest.raises(ValueError, match="actor must not be empty"):
+        with pytest.raises(ValueError, match="actor cannot be blank"):
             AuditContext(actor=" ", reason="bootstrap")
-        with pytest.raises(ValueError, match="reason must not be empty"):
+        with pytest.raises(ValueError, match="reason cannot be blank"):
             AuditContext(actor="tester", reason=" ")
         with pytest.raises(ValueError, match="busy_timeout_ms must be positive"):
             PersistenceConfig(tmp_path / "db.sqlite3", busy_timeout_ms=0)
@@ -240,10 +239,11 @@ class TestGatewayAndPackageEdges:
         assert finestvx.StoreWriteReceipt is persistence_module.StoreWriteReceipt
         assert finestvx.AsyncLedgerReader is persistence_module.AsyncLedgerReader
 
+        registry = finestvx.create_default_pack_registry()
         with pytest.raises(TypeError, match="pack_code must be str"):
-            _normalize_pack_code(1)
-        with pytest.raises(ValueError, match="pack_code must not be empty"):
-            _normalize_pack_code("   ")
+            registry.resolve(cast("Any", 1))
+        with pytest.raises(ValueError, match="pack_code cannot be blank"):
+            registry.resolve("   ")
         with pytest.raises(AttributeError, match="has no attribute"):
             persistence_module.__getattr__("missing_export")
 
