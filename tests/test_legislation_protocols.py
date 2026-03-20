@@ -56,7 +56,7 @@ class TestLegislativeProtocolDataclasses:
                 default_locale="lv-LV",
                 currencies=(CurrencyCode("EUR"),),
             )
-        with pytest.raises(ValueError, match="tax_year must be between 1 and 9999"):
+        with pytest.raises(ValueError, match=r"tax_year must be in range \[1, 9999\]"):
             LegislativePackMetadata(
                 pack_code="lv.standard.2026",
                 territory_code=TerritoryCode("LV"),

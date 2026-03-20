@@ -10,7 +10,6 @@ import pytest
 from ftllexengine import FiscalCalendar, FiscalPeriod, FluentNumber, make_fluent_number
 from ftllexengine.introspection import CurrencyCode
 
-import finestvx.core._validators as validators_module
 import finestvx.core.models as models_module
 from finestvx.core import Account, Book, BookPeriod, JournalTransaction, LedgerEntry, PostingSide
 from finestvx.core.enums import TransactionState
@@ -21,21 +20,39 @@ _POSTED_AT = datetime(2026, 1, 15, 9, 30, tzinfo=UTC)
 class TestCoreModelHelpers:
     """Direct checks for private validation helpers."""
 
-    def test_text_ratio_and_tuple_helpers_reject_invalid_values(self) -> None:
-        """Primitive validators reject invalid scalar inputs with clear errors."""
-        with pytest.raises(TypeError, match="field must be str"):
-            validators_module.normalize_optional_text(1, "field")
-        with pytest.raises(ValueError, match="field cannot be blank"):
-            validators_module.normalize_optional_text("   ", "field")
-        assert validators_module.normalize_optional_text(None, "field") is None
-        assert validators_module.normalize_optional_text(" value ", "field") == "value"
+    def test_optional_text_and_decimal_ratio_validated_through_domain_model(self) -> None:
+        """Domain models reject invalid optional-text and decimal-ratio values at construction."""
+        _amount = make_fluent_number(Decimal("1.00"))
+        _cur = CurrencyCode("EUR")
 
-        with pytest.raises(TypeError, match="tax_rate must be Decimal, not bool"):
-            models_module._require_decimal_ratio(True, "tax_rate")
-        with pytest.raises(TypeError, match="tax_rate must be Decimal"):
-            models_module._require_decimal_ratio("0.21", "tax_rate")
+        def _entry(
+            description: Any = None,
+            tax_rate: Any = None,
+        ) -> LedgerEntry:
+            return LedgerEntry(
+                account_code="1000",
+                side=PostingSide.DEBIT,
+                amount=_amount,
+                currency=_cur,
+                description=description,
+                tax_rate=tax_rate,
+            )
+
+        with pytest.raises(TypeError, match="description must be str"):
+            _entry(description=1)
+        with pytest.raises(ValueError, match="description cannot be blank"):
+            _entry(description="   ")
+        no_desc = _entry(description=None)
+        assert no_desc.description is None
+        padded = _entry(description=" value ")
+        assert padded.description == "value"
+
+        with pytest.raises(TypeError, match="tax_rate must be Decimal, got bool"):
+            _entry(tax_rate=True)
+        with pytest.raises(TypeError, match="tax_rate must be Decimal, got str"):
+            _entry(tax_rate="0.21")
         with pytest.raises(ValueError, match="tax_rate must be finite"):
-            models_module._require_decimal_ratio(Decimal("NaN"), "tax_rate")
+            _entry(tax_rate=Decimal("NaN"))
 
     def test_sequence_fields_accept_list_input_and_normalize_to_tuple(self) -> None:
         """Sequence-typed model fields accept list input and normalize to immutable tuple."""

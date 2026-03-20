@@ -14,6 +14,8 @@ from ftllexengine import (
     FiscalPeriod,
     FluentNumber,
     coerce_tuple,
+    normalize_optional_decimal_range,
+    normalize_optional_str,
     require_non_empty_str,
 )
 from ftllexengine.introspection import (
@@ -22,7 +24,6 @@ from ftllexengine.introspection import (
     is_valid_currency_code,
 )
 
-from ._validators import normalize_optional_text
 from .enums import FiscalPeriodState, PostingSide, TransactionState
 
 if TYPE_CHECKING:
@@ -49,24 +50,6 @@ def _normalize_currency(value: object, field_name: str) -> CurrencyCode:
         raise ValueError(msg)
     return normalized
 
-
-def _require_decimal_ratio(value: object, field_name: str) -> Decimal | None:
-    """Validate an optional decimal ratio constrained to the inclusive range 0..1."""
-    if value is None:
-        return None
-    if isinstance(value, bool):
-        msg = f"{field_name} must be Decimal, not bool"
-        raise TypeError(msg)
-    if not isinstance(value, Decimal):
-        msg = f"{field_name} must be Decimal, got {type(value).__name__}"
-        raise TypeError(msg)
-    if not value.is_finite():
-        msg = f"{field_name} must be finite"
-        raise ValueError(msg)
-    if not _ZERO <= value <= Decimal(1):
-        msg = f"{field_name} must be between 0 and 1 inclusive"
-        raise ValueError(msg)
-    return value
 
 
 def _require_fluent_number(value: object, field_name: str) -> FluentNumber:
@@ -313,7 +296,7 @@ class Account:
         object.__setattr__(
             self,
             "parent_code",
-            normalize_optional_text(self.parent_code, "parent_code"),
+            normalize_optional_str(self.parent_code, "parent_code"),
         )
         object.__setattr__(
             self,
@@ -391,9 +374,13 @@ class LedgerEntry:
         object.__setattr__(
             self,
             "description",
-            normalize_optional_text(self.description, "description"),
+            normalize_optional_str(self.description, "description"),
         )
-        object.__setattr__(self, "tax_rate", _require_decimal_ratio(self.tax_rate, "tax_rate"))
+        object.__setattr__(
+            self,
+            "tax_rate",
+            normalize_optional_decimal_range(self.tax_rate, _ZERO, Decimal(1), "tax_rate"),
+        )
 
     @property
     def decimal_value(self) -> Decimal:
@@ -442,7 +429,7 @@ class JournalTransaction:
         object.__setattr__(
             self,
             "reversal_of",
-            normalize_optional_text(self.reversal_of, "reversal_of"),
+            normalize_optional_str(self.reversal_of, "reversal_of"),
         )
         if self.reversal_of == self.reference:
             msg = "reversal_of must reference a different transaction"

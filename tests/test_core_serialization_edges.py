@@ -9,7 +9,6 @@ import pytest
 from ftllexengine import FiscalCalendar, FiscalPeriod, make_fluent_number
 from ftllexengine.introspection import CurrencyCode
 
-import finestvx.core._validators as validators_module
 import finestvx.core.serialization as serialization_module
 from finestvx.core import Account, Book, BookPeriod, JournalTransaction, LedgerEntry, PostingSide
 from finestvx.core.enums import FiscalPeriodState, TransactionState
@@ -110,10 +109,16 @@ class TestSerializationHelpers:
             serialization_module._require_mapping([], "payload")
         with pytest.raises(TypeError, match="entries must be a sequence"):
             serialization_module._require_sequence("bad", "entries")
-        with pytest.raises(TypeError, match="name must be str"):
-            validators_module.normalize_optional_text(1, "name")
-        with pytest.raises(ValueError, match="name cannot be blank"):
-            validators_module.normalize_optional_text("  ", "name")
+        with pytest.raises(TypeError, match=r"entry\.description must be str"):
+            serialization_module._entry_from_mapping(
+                {"account_code": "1000", "side": "Dr", "amount": "1.00",
+                 "currency": "EUR", "description": 1}
+            )
+        with pytest.raises(ValueError, match=r"entry\.description cannot be blank"):
+            serialization_module._entry_from_mapping(
+                {"account_code": "1000", "side": "Dr", "amount": "1.00",
+                 "currency": "EUR", "description": "  "}
+            )
         with pytest.raises(TypeError, match="start_date must be ISO date text"):
             serialization_module._require_date(1, "start_date")
         with pytest.raises(TypeError, match="posted_at must be ISO datetime text"):

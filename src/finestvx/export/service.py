@@ -4,23 +4,28 @@ from __future__ import annotations
 
 import csv
 import json
+import time
 from dataclasses import dataclass
+from datetime import date, datetime
+from decimal import Decimal
 from io import BytesIO, StringIO
 from pathlib import Path
-from typing import TYPE_CHECKING
 
+from ftllexengine import FiscalCalendar, FiscalPeriod, make_fluent_number
+from ftllexengine.integrity import IntegrityContext, PersistenceIntegrityError
+from ftllexengine.introspection import CurrencyCode
 from lxml import etree
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
+from finestvx.core.enums import FiscalPeriodState, PostingSide, TransactionState
+from finestvx.core.models import Account, Book, BookPeriod, JournalTransaction, LedgerEntry
 from finestvx.core.serialization import book_to_mapping
-
-if TYPE_CHECKING:
-    from finestvx.core.models import Book
 
 __all__ = [
     "ExportArtifact",
     "LedgerExporter",
+    "book_from_saft",
 ]
 
 
@@ -213,3 +218,140 @@ class LedgerExporter:
                 y = 800
         pdf.save()
         return ExportArtifact("pdf", "application/pdf", buffer.getvalue())
+
+
+def _parse_entry(entry_el: etree._Element) -> LedgerEntry:
+    """Parse a single ``<entry>`` element into a LedgerEntry."""
+    tax_rate_str = entry_el.get("tax-rate")
+    return LedgerEntry(
+        account_code=entry_el.get("account-code", ""),
+        side=PostingSide(entry_el.get("side", "")),
+        amount=make_fluent_number(Decimal(entry_el.get("amount", "0"))),
+        currency=CurrencyCode(entry_el.get("currency", "")),
+        description=entry_el.get("description"),
+        tax_rate=Decimal(tax_rate_str) if tax_rate_str is not None else None,
+    )
+
+
+def _parse_transaction(tx_el: etree._Element) -> JournalTransaction:
+    """Parse a single ``<transaction>`` element into a JournalTransaction."""
+    period: FiscalPeriod | None = None
+    if tx_el.get("period-fiscal-year") is not None:
+        period = FiscalPeriod(
+            fiscal_year=int(tx_el.get("period-fiscal-year", "0")),
+            quarter=int(tx_el.get("period-quarter", "0")),
+            month=int(tx_el.get("period-month", "0")),
+        )
+    return JournalTransaction(
+        reference=tx_el.get("reference", ""),
+        posted_at=datetime.fromisoformat(tx_el.get("posted-at", "")),
+        state=TransactionState(tx_el.get("state", "")),
+        description=tx_el.get("description", ""),
+        entries=tuple(_parse_entry(e) for e in tx_el),
+        reversal_of=tx_el.get("reversal-of"),
+        period=period,
+    )
+
+
+def _book_from_element(root: etree._Element) -> Book:
+    """Parse a validated ``<ledger-book>`` element into a Book aggregate."""
+    fiscal_calendar = FiscalCalendar(start_month=int(root.get("fiscal-start-month", "1")))
+
+    accounts_el = root.find("accounts")
+    accounts = (
+        [
+            Account(
+                code=account_el.get("code", ""),
+                name=account_el.get("name", ""),
+                normal_side=PostingSide(account_el.get("normal-side", "")),
+                currency=CurrencyCode(account_el.get("currency", "")),
+                parent_code=account_el.get("parent-code"),
+                allow_posting=account_el.get("allow-posting", "true") == "true",
+                active=account_el.get("active", "true") == "true",
+            )
+            for account_el in accounts_el
+        ]
+        if accounts_el is not None
+        else []
+    )
+
+    periods_el = root.find("periods")
+    periods = (
+        [
+            BookPeriod(
+                period=FiscalPeriod(
+                    fiscal_year=int(period_el.get("fiscal-year", "0")),
+                    quarter=int(period_el.get("quarter", "0")),
+                    month=int(period_el.get("month", "0")),
+                ),
+                start_date=date.fromisoformat(period_el.get("start-date", "")),
+                end_date=date.fromisoformat(period_el.get("end-date", "")),
+                state=FiscalPeriodState(period_el.get("state", "")),
+            )
+            for period_el in periods_el
+        ]
+        if periods_el is not None
+        else []
+    )
+
+    transactions_el = root.find("transactions")
+    transactions = (
+        [_parse_transaction(tx_el) for tx_el in transactions_el]
+        if transactions_el is not None
+        else []
+    )
+
+    return Book(
+        code=root.get("code", ""),
+        name=root.get("name", ""),
+        base_currency=CurrencyCode(root.get("base-currency", "")),
+        legislative_pack=root.get("legislative-pack", ""),
+        fiscal_calendar=fiscal_calendar,
+        accounts=tuple(accounts),
+        periods=tuple(periods),
+        transactions=tuple(transactions),
+    )
+
+
+def book_from_saft(path: Path | str) -> Book:
+    """Import a FinestVX SAF-T XML file and return the corresponding Book aggregate.
+
+    Validates the file against the bundled XSD schema before parsing. Raises
+    :class:`~ftllexengine.integrity.PersistenceIntegrityError` on any parse,
+    schema, or domain invariant failure.
+
+    Args:
+        path: Filesystem path to the SAF-T XML file.
+
+    Returns:
+        The reconstructed :class:`~finestvx.core.models.Book` aggregate.
+
+    Raises:
+        PersistenceIntegrityError: If the file cannot be parsed, fails schema
+            validation, or contains data that violates domain invariants.
+    """
+    source_path = Path(path)
+    integrity_context = IntegrityContext(
+        component="export.saft",
+        operation="book_from_saft",
+        key=str(source_path),
+        timestamp=time.monotonic(),
+    )
+    schema_path = Path(__file__).with_name("ledger.xsd")
+    schema_doc = etree.parse(str(schema_path))
+    xml_schema = etree.XMLSchema(schema_doc)
+    try:
+        document = etree.parse(str(source_path))
+    except etree.XMLSyntaxError as error:
+        msg = f"SAF-T XML parse failed: {error}"
+        raise PersistenceIntegrityError(msg, integrity_context) from error
+    try:
+        xml_schema.assertValid(document)
+    except etree.DocumentInvalid as error:
+        msg = f"SAF-T XML schema validation failed: {error}"
+        raise PersistenceIntegrityError(msg, integrity_context) from error
+    try:
+        return _book_from_element(document.getroot())
+    except (ValueError, TypeError) as error:
+        msg = f"SAF-T import domain invariant violation: {error}"
+        raise PersistenceIntegrityError(msg, integrity_context) from error

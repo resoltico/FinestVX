@@ -131,6 +131,191 @@ class TestSqliteLedgerStore:
 
         store.close()
 
+    def test_append_reversal_creates_inverted_transaction(self, tmp_path: Path) -> None:
+        """append_reversal creates a mirror transaction with all entries inverted."""
+        database_path = tmp_path / "ledger.sqlite3"
+        store = SqliteLedgerStore(PersistenceConfig(database_path))
+        book = build_sample_book()
+        tx = build_posted_transaction(reference="TX-2026-0010")
+        store.create_book(book, audit_context=AuditContext(actor="tester", reason="bootstrap"))
+        store.append_transaction(
+            book.code, tx, audit_context=AuditContext(actor="tester", reason="post")
+        )
+
+        receipt = store.append_reversal(
+            book.code,
+            "TX-2026-0010",
+            "TX-2026-0010-REV",
+            audit_context=AuditContext(actor="tester", reason="reversal"),
+        )
+
+        loaded = store.load_book(book.code)
+        references = [t.reference for t in loaded.transactions]
+        assert "TX-2026-0010" in references
+        assert "TX-2026-0010-REV" in references
+        reversal = next(t for t in loaded.transactions if t.reference == "TX-2026-0010-REV")
+        original = next(t for t in loaded.transactions if t.reference == "TX-2026-0010")
+        assert reversal.reversal_of == "TX-2026-0010"
+        assert reversal.is_balanced is True
+        assert len(reversal.entries) == len(original.entries)
+        original_sides = [e.side for e in original.entries]
+        reversal_sides = [e.side for e in reversal.entries]
+        assert original_sides[0] != reversal_sides[0]
+        assert original_sides[1] != reversal_sides[1]
+        assert "transactions" in receipt.changed_tables
+
+        store.close()
+
+    def test_append_reversal_rejects_unknown_book_and_missing_transaction(
+        self, tmp_path: Path
+    ) -> None:
+        """append_reversal raises the correct errors for invalid inputs."""
+        database_path = tmp_path / "ledger.sqlite3"
+        store = SqliteLedgerStore(PersistenceConfig(database_path))
+        book = build_sample_book()
+        store.create_book(book, audit_context=AuditContext(actor="tester", reason="bootstrap"))
+        audit = AuditContext(actor="tester", reason="reversal")
+
+        with pytest.raises(KeyError, match="unknown-book"):
+            store.append_reversal("unknown-book", "TX-MISSING", "TX-REV", audit_context=audit)
+
+        with pytest.raises(ValueError, match="not found"):
+            store.append_reversal(book.code, "TX-MISSING", "TX-REV", audit_context=audit)
+
+        store.close()
+
+    def test_append_reversal_prevents_double_reversal(self, tmp_path: Path) -> None:
+        """append_reversal raises ValueError when the original is already reversed."""
+        database_path = tmp_path / "ledger.sqlite3"
+        store = SqliteLedgerStore(PersistenceConfig(database_path))
+        book = build_sample_book()
+        tx = build_posted_transaction(reference="TX-2026-0011")
+        store.create_book(book, audit_context=AuditContext(actor="tester", reason="bootstrap"))
+        store.append_transaction(
+            book.code, tx, audit_context=AuditContext(actor="tester", reason="post")
+        )
+        store.append_reversal(
+            book.code,
+            "TX-2026-0011",
+            "TX-2026-0011-REV",
+            audit_context=AuditContext(actor="tester", reason="reversal"),
+        )
+
+        with pytest.raises(ValueError, match="already reversed"):
+            store.append_reversal(
+                book.code,
+                "TX-2026-0011",
+                "TX-2026-0011-REV-2",
+                audit_context=AuditContext(actor="tester", reason="second-reversal"),
+            )
+
+        store.close()
+
+    def test_iter_audit_log_pages_yields_pages_without_full_materialization(
+        self, tmp_path: Path
+    ) -> None:
+        """iter_audit_log_pages returns the same records as iter_audit_log split into pages."""
+        database_path = tmp_path / "ledger.sqlite3"
+        store = SqliteLedgerStore(PersistenceConfig(database_path))
+        book = build_sample_book()
+        store.create_book(book, audit_context=AuditContext(actor="tester", reason="bootstrap"))
+        for i in range(3):
+            store.append_transaction(
+                book.code,
+                build_posted_transaction(reference=f"TX-PAGE-{i:04d}"),
+                audit_context=AuditContext(actor="tester", reason=f"tx-{i}"),
+            )
+
+        all_rows = store.iter_audit_log()
+        pages = list(store.iter_audit_log_pages(page_size=4))
+
+        paged_rows = tuple(row for page in pages for row in page)
+        assert paged_rows == all_rows
+        assert all(len(page) <= 4 for page in pages)
+        assert len(pages) > 1
+
+        store.close()
+
+    def test_append_reversal_rejects_duplicate_reversal_ref(self, tmp_path: Path) -> None:
+        """append_reversal raises ValueError when the reversal_ref is already in use."""
+        database_path = tmp_path / "ledger.sqlite3"
+        store = SqliteLedgerStore(PersistenceConfig(database_path))
+        book = build_sample_book()
+        store.create_book(book, audit_context=AuditContext(actor="tester", reason="bootstrap"))
+        store.append_transaction(
+            book.code,
+            build_posted_transaction(reference="TX-2026-0012"),
+            audit_context=AuditContext(actor="tester", reason="post"),
+        )
+        store.append_transaction(
+            book.code,
+            build_posted_transaction(reference="TX-2026-0013"),
+            audit_context=AuditContext(actor="tester", reason="post"),
+        )
+
+        with pytest.raises(ValueError, match="already in use"):
+            store.append_reversal(
+                book.code,
+                "TX-2026-0012",
+                "TX-2026-0013",
+                audit_context=AuditContext(actor="tester", reason="reversal"),
+            )
+
+        store.close()
+
+    def test_iter_audit_log_pages_with_start_seq_skips_earlier_entries(
+        self, tmp_path: Path
+    ) -> None:
+        """iter_audit_log_pages with start_seq skips rows up to and including start_seq."""
+        database_path = tmp_path / "ledger.sqlite3"
+        store = SqliteLedgerStore(PersistenceConfig(database_path))
+        book = build_sample_book()
+        store.create_book(book, audit_context=AuditContext(actor="tester", reason="bootstrap"))
+        store.append_transaction(
+            book.code,
+            build_posted_transaction(reference="TX-SKIP-0001"),
+            audit_context=AuditContext(actor="tester", reason="post"),
+        )
+
+        all_rows = store.iter_audit_log()
+        cutoff_seq = all_rows[2].seq
+        paged = list(store.iter_audit_log_pages(start_seq=cutoff_seq))
+        paged_rows = tuple(row for page in paged for row in page)
+
+        assert all(row.seq > cutoff_seq for row in paged_rows)
+
+        store.close()
+
+    def test_async_iter_audit_log_pages_yields_pages(self, tmp_path: Path) -> None:
+        """AsyncLedgerReader.iter_audit_log_pages yields cursor-paginated records."""
+        database_path = tmp_path / "ledger.sqlite3"
+        config = PersistenceConfig(database_path, reserve_bytes=8)
+        store = SqliteLedgerStore(config)
+        book = build_sample_book()
+        store.create_book(book, audit_context=AuditContext(actor="tester", reason="bootstrap"))
+        for i in range(3):
+            store.append_transaction(
+                book.code,
+                build_posted_transaction(reference=f"TX-ASYNC-{i:04d}"),
+                audit_context=AuditContext(actor="tester", reason=f"tx-{i}"),
+            )
+        all_rows = store.iter_audit_log()
+
+        async def exercise_async_pages() -> None:
+            reader = await store.open_async_reader()
+            try:
+                pages: list[tuple[object, ...]] = []
+                async for page in reader.iter_audit_log_pages(page_size=4):
+                    pages.append(page)
+                paged_rows = tuple(row for page in pages for row in page)
+                assert len(paged_rows) == len(all_rows)
+                assert all(len(page) <= 4 for page in pages)
+            finally:
+                reader.close()
+
+        asyncio.run(exercise_async_pages())
+        store.close()
+
     def test_zstd_snapshot_is_created(self, tmp_path: Path) -> None:
         """Snapshots are WAL-consistent and can be decompressed back to SQLite bytes."""
         database_path = tmp_path / "ledger.sqlite3"

@@ -14,7 +14,12 @@ from ftllexengine.introspection import CurrencyCode
 
 import finestvx.validation.service as validation_module
 from finestvx.core import Account, JournalTransaction, LedgerEntry, PostingSide, TransactionState
-from finestvx.validation import validate_book, validate_ftl_resource, validate_transaction
+from finestvx.validation import (
+    validate_book,
+    validate_ftl_resource,
+    validate_fx_conversion,
+    validate_transaction,
+)
 from tests.support.book_factory import build_posted_transaction, build_sample_book
 
 _POSTED_AT = datetime(2026, 1, 15, 9, 30, tzinfo=UTC)
@@ -103,6 +108,162 @@ class TestValidationServiceEdges:
             build_posted_transaction(reference="TX-2026-3003"),
         )
         assert missing_account_report.findings[0].code == "TRANSACTION_UNKNOWN_ACCOUNT"
+
+    def test_validate_fx_conversion_accepts_exact_rate(self) -> None:
+        """An FX transaction with a matching rate produces an accepted report."""
+        transaction = JournalTransaction(
+            reference="TX-FX-0001",
+            posted_at=_POSTED_AT,
+            description="EUR/USD sale",
+            state=TransactionState.POSTED,
+            entries=(
+                LedgerEntry(
+                    account_code="1000",
+                    side=PostingSide.DEBIT,
+                    amount=make_fluent_number(Decimal("100.00")),
+                    currency=CurrencyCode("EUR"),
+                ),
+                LedgerEntry(
+                    account_code="2000",
+                    side=PostingSide.CREDIT,
+                    amount=make_fluent_number(Decimal("100.00")),
+                    currency=CurrencyCode("EUR"),
+                ),
+                LedgerEntry(
+                    account_code="1000",
+                    side=PostingSide.CREDIT,
+                    amount=make_fluent_number(Decimal("110.00")),
+                    currency=CurrencyCode("USD"),
+                ),
+                LedgerEntry(
+                    account_code="2000",
+                    side=PostingSide.DEBIT,
+                    amount=make_fluent_number(Decimal("110.00")),
+                    currency=CurrencyCode("USD"),
+                ),
+            ),
+        )
+
+        report = validate_fx_conversion(
+            transaction,
+            CurrencyCode("EUR"),
+            CurrencyCode("USD"),
+            Decimal("1.10"),
+        )
+
+        assert report.accepted is True
+        assert report.findings == ()
+
+    def test_validate_fx_conversion_rejects_invalid_rate(self) -> None:
+        """A non-positive or non-finite rate produces FX_RATE_INVALID."""
+        transaction = JournalTransaction(
+            reference="TX-FX-0002",
+            posted_at=_POSTED_AT,
+            description="FX dummy",
+            state=TransactionState.POSTED,
+            entries=(
+                LedgerEntry(
+                    account_code="1000",
+                    side=PostingSide.DEBIT,
+                    amount=make_fluent_number(Decimal("1.00")),
+                    currency=CurrencyCode("EUR"),
+                ),
+                LedgerEntry(
+                    account_code="2000",
+                    side=PostingSide.CREDIT,
+                    amount=make_fluent_number(Decimal("1.00")),
+                    currency=CurrencyCode("EUR"),
+                ),
+            ),
+        )
+
+        zero_report = validate_fx_conversion(
+            transaction, CurrencyCode("EUR"), CurrencyCode("USD"), Decimal(0)
+        )
+        neg_report = validate_fx_conversion(
+            transaction, CurrencyCode("EUR"), CurrencyCode("USD"), Decimal("-1.0")
+        )
+
+        assert zero_report.findings[0].code == "FX_RATE_INVALID"
+        assert neg_report.findings[0].code == "FX_RATE_INVALID"
+
+    def test_validate_fx_conversion_reports_absent_currencies(self) -> None:
+        """Missing base or counter currency entries produce distinct findings."""
+        eur_only = JournalTransaction(
+            reference="TX-FX-0003",
+            posted_at=_POSTED_AT,
+            description="Single-currency tx",
+            state=TransactionState.POSTED,
+            entries=(
+                LedgerEntry(
+                    account_code="1000",
+                    side=PostingSide.DEBIT,
+                    amount=make_fluent_number(Decimal("50.00")),
+                    currency=CurrencyCode("EUR"),
+                ),
+                LedgerEntry(
+                    account_code="2000",
+                    side=PostingSide.CREDIT,
+                    amount=make_fluent_number(Decimal("50.00")),
+                    currency=CurrencyCode("EUR"),
+                ),
+            ),
+        )
+
+        base_absent = validate_fx_conversion(
+            eur_only, CurrencyCode("GBP"), CurrencyCode("USD"), Decimal("1.25")
+        )
+        counter_absent = validate_fx_conversion(
+            eur_only, CurrencyCode("EUR"), CurrencyCode("USD"), Decimal("1.10")
+        )
+
+        assert any(f.code == "FX_BASE_CURRENCY_ABSENT" for f in base_absent.findings)
+        assert any(f.code == "FX_COUNTER_CURRENCY_ABSENT" for f in counter_absent.findings)
+
+    def test_validate_fx_conversion_reports_rate_mismatch(self) -> None:
+        """A rate mismatch beyond precision tolerance produces FX_RATE_MISMATCH."""
+        transaction = JournalTransaction(
+            reference="TX-FX-0004",
+            posted_at=_POSTED_AT,
+            description="EUR/USD mismatch",
+            state=TransactionState.POSTED,
+            entries=(
+                LedgerEntry(
+                    account_code="1000",
+                    side=PostingSide.DEBIT,
+                    amount=make_fluent_number(Decimal("100.00")),
+                    currency=CurrencyCode("EUR"),
+                ),
+                LedgerEntry(
+                    account_code="2000",
+                    side=PostingSide.CREDIT,
+                    amount=make_fluent_number(Decimal("100.00")),
+                    currency=CurrencyCode("EUR"),
+                ),
+                LedgerEntry(
+                    account_code="1000",
+                    side=PostingSide.CREDIT,
+                    amount=make_fluent_number(Decimal("105.00")),
+                    currency=CurrencyCode("USD"),
+                ),
+                LedgerEntry(
+                    account_code="2000",
+                    side=PostingSide.DEBIT,
+                    amount=make_fluent_number(Decimal("105.00")),
+                    currency=CurrencyCode("USD"),
+                ),
+            ),
+        )
+
+        report = validate_fx_conversion(
+            transaction,
+            CurrencyCode("EUR"),
+            CurrencyCode("USD"),
+            Decimal("1.10"),
+        )
+
+        assert report.accepted is False
+        assert report.findings[0].code == "FX_RATE_MISMATCH"
 
     def test_warning_severity_mapping_and_ftl_annotation_reporting(self) -> None:
         """Static FTL validation maps warnings and junk annotations into reports."""

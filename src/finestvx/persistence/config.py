@@ -5,13 +5,20 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ftllexengine import CacheConfig, require_non_empty_str, require_positive_int
+from ftllexengine import (
+    CacheConfig,
+    require_int_in_range,
+    require_non_empty_str,
+    require_non_negative_int,
+    require_positive_int,
+)
 
 __all__ = [
     "MANDATED_CACHE_CONFIG",
     "AuditContext",
     "DatabaseSnapshot",
     "PersistenceConfig",
+    "ReadReplicaConfig",
 ]
 
 MANDATED_CACHE_CONFIG = CacheConfig(
@@ -78,18 +85,10 @@ class PersistenceConfig:
         if self.reader_checkout_timeout <= 0:
             msg = "reader_checkout_timeout must be positive"
             raise ValueError(msg)
-        if self.writer_statement_cache_size < 0:
-            msg = "writer_statement_cache_size must be non-negative"
-            raise ValueError(msg)
-        if self.reader_statement_cache_size < 0:
-            msg = "reader_statement_cache_size must be non-negative"
-            raise ValueError(msg)
-        if not 0 <= self.reserve_bytes <= 255:
-            msg = "reserve_bytes must be between 0 and 255 inclusive"
-            raise ValueError(msg)
-        if self.telemetry_buffer_size < 0:
-            msg = "telemetry_buffer_size must be non-negative"
-            raise ValueError(msg)
+        require_non_negative_int(self.writer_statement_cache_size, "writer_statement_cache_size")
+        require_non_negative_int(self.reader_statement_cache_size, "reader_statement_cache_size")
+        require_int_in_range(self.reserve_bytes, 0, 255, "reserve_bytes")
+        require_non_negative_int(self.telemetry_buffer_size, "telemetry_buffer_size")
 
     def _validate_transaction_mode(self) -> None:
         """Validate the SQLite transaction mode."""
@@ -100,6 +99,25 @@ class PersistenceConfig:
                 f"{sorted(allowed_modes)}, got {self.transaction_mode}"
             )
             raise ValueError(msg)
+
+
+@dataclass(frozen=True, slots=True)
+class ReadReplicaConfig:
+    """Configuration for a periodically refreshed read-only WAL connection."""
+
+    database_path: Path | str
+    checkpoint_interval: float = 1.0
+    reader_statement_cache_size: int = 128
+    reserve_bytes: int = 0
+
+    def __post_init__(self) -> None:
+        """Normalize the path and validate connection settings."""
+        object.__setattr__(self, "database_path", Path(self.database_path))
+        if self.checkpoint_interval <= 0:
+            msg = "checkpoint_interval must be positive"
+            raise ValueError(msg)
+        require_non_negative_int(self.reader_statement_cache_size, "reader_statement_cache_size")
+        require_int_in_range(self.reserve_bytes, 0, 255, "reserve_bytes")
 
 
 @dataclass(frozen=True, slots=True)

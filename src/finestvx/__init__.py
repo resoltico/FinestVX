@@ -25,7 +25,7 @@ if TYPE_CHECKING:
         validate_chart_of_accounts,
         validate_transaction_balance,
     )
-    from .export import ExportArtifact, LedgerExporter
+    from .export import ExportArtifact, LedgerExporter, book_from_saft
     from .gateway import (
         FinestVXService,
         FinestVXServiceConfig,
@@ -50,6 +50,8 @@ if TYPE_CHECKING:
         AuditLogRecord,
         DatabaseSnapshot,
         PersistenceConfig,
+        ReadReplica,
+        ReadReplicaConfig,
         SqliteLedgerStore,
         StoreConnectionDebugSnapshot,
         StoreDebugSnapshot,
@@ -61,7 +63,14 @@ if TYPE_CHECKING:
         StoreWriteReceipt,
         create_snapshot,
     )
-    from .runtime import LedgerRuntime, RuntimeConfig, RuntimeDebugSnapshot
+    from .runtime import (
+        LedgerRuntime,
+        MultiBookDebugSnapshot,
+        MultiBookRuntime,
+        MultiBookRuntimeConfig,
+        RuntimeConfig,
+        RuntimeDebugSnapshot,
+    )
     from .validation import (
         ValidationFinding,
         ValidationReport,
@@ -111,9 +120,14 @@ __all__ = [
     "LegislativePackMetadata",
     "LegislativePackRegistry",
     "LegislativeValidationResult",
+    "MultiBookDebugSnapshot",
+    "MultiBookRuntime",
+    "MultiBookRuntimeConfig",
     "PersistenceConfig",
     "PostedTransactionResult",
     "PostingSide",
+    "ReadReplica",
+    "ReadReplicaConfig",
     "RuntimeConfig",
     "RuntimeDebugSnapshot",
     "SqliteLedgerStore",
@@ -130,6 +144,7 @@ __all__ = [
     "ValidationFinding",
     "ValidationReport",
     "ValidationSeverity",
+    "book_from_saft",
     "create_default_pack_registry",
     "create_snapshot",
     "validate_book",
@@ -153,6 +168,7 @@ _EXPORT_MAP: dict[str, tuple[str, str]] = {
     "BookPeriod": ("finestvx.core", "BookPeriod"),
     "DatabaseSnapshot": ("finestvx.persistence", "DatabaseSnapshot"),
     "ExportArtifact": ("finestvx.export", "ExportArtifact"),
+    "book_from_saft": ("finestvx.export", "book_from_saft"),
     "FiscalPeriodState": ("finestvx.core", "FiscalPeriodState"),
     "FluentAmount": ("finestvx.core", "FluentAmount"),
     "FinestVXService": ("finestvx.gateway", "FinestVXService"),
@@ -163,6 +179,9 @@ _EXPORT_MAP: dict[str, tuple[str, str]] = {
     "LedgerEntry": ("finestvx.core", "LedgerEntry"),
     "LedgerExporter": ("finestvx.export", "LedgerExporter"),
     "LedgerRuntime": ("finestvx.runtime", "LedgerRuntime"),
+    "MultiBookDebugSnapshot": ("finestvx.runtime", "MultiBookDebugSnapshot"),
+    "MultiBookRuntime": ("finestvx.runtime", "MultiBookRuntime"),
+    "MultiBookRuntimeConfig": ("finestvx.runtime", "MultiBookRuntimeConfig"),
     "LatviaStandard2026Pack": ("finestvx.legislation", "LatviaStandard2026Pack"),
     "LegislativeInterpreterRunner": (
         "finestvx.legislation",
@@ -178,6 +197,8 @@ _EXPORT_MAP: dict[str, tuple[str, str]] = {
     ),
     "MANDATED_CACHE_CONFIG": ("finestvx.persistence", "MANDATED_CACHE_CONFIG"),
     "PersistenceConfig": ("finestvx.persistence", "PersistenceConfig"),
+    "ReadReplica": ("finestvx.persistence", "ReadReplica"),
+    "ReadReplicaConfig": ("finestvx.persistence", "ReadReplicaConfig"),
     "PostedTransactionResult": ("finestvx.gateway", "PostedTransactionResult"),
     "PostingSide": ("finestvx.core", "PostingSide"),
     "RuntimeConfig": ("finestvx.runtime", "RuntimeConfig"),

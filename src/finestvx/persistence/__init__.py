@@ -5,10 +5,17 @@ from __future__ import annotations
 from importlib import import_module
 from typing import TYPE_CHECKING
 
-from .config import MANDATED_CACHE_CONFIG, AuditContext, DatabaseSnapshot, PersistenceConfig
+from .config import (
+    MANDATED_CACHE_CONFIG,
+    AuditContext,
+    DatabaseSnapshot,
+    PersistenceConfig,
+    ReadReplicaConfig,
+)
 
 if TYPE_CHECKING:
     from .backup import create_snapshot
+    from .replica import ReadReplica
     from .store import (
         AsyncLedgerReader,
         AuditLogRecord,
@@ -30,6 +37,8 @@ __all__ = [
     "AuditLogRecord",
     "DatabaseSnapshot",
     "PersistenceConfig",
+    "ReadReplica",
+    "ReadReplicaConfig",
     "SqliteLedgerStore",
     "StoreConnectionDebugSnapshot",
     "StoreDebugSnapshot",
@@ -61,5 +70,7 @@ def __getattr__(name: str) -> object:
         return getattr(import_module(".store", __name__), name)
     if name == "create_snapshot":
         return getattr(import_module(".backup", __name__), name)
+    if name == "ReadReplica":
+        return getattr(import_module(".replica", __name__), name)
     msg = f"module {__name__!r} has no attribute {name!r}"
     raise AttributeError(msg)

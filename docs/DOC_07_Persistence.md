@@ -1,11 +1,11 @@
 ---
 afad: "3.3"
-version: "0.7.0"
+version: "0.10.0"
 domain: SECONDARY
-updated: "2026-03-17"
+updated: "2026-03-19"
 route:
-  keywords: [persistence, apsw, sqlite wal, reader pool, async reader, changeset, patchset, reserve bytes, store debug snapshot, wal hook]
-  questions: ["how does finestvx persistence work now?", "what does SqliteLedgerStore return on writes?", "how are APSW readers configured?", "what telemetry does the store expose?", "how do async reads work?", "how are reserve bytes enforced?"]
+  keywords: [persistence, apsw, sqlite wal, reader pool, async reader, changeset, patchset, reserve bytes, store debug snapshot, wal hook, append reversal, reversal, audit log pages, iter audit log pages, read replica, read replica config, wal snapshot, checkpoint interval]
+  questions: ["how does finestvx persistence work now?", "what does SqliteLedgerStore return on writes?", "how are APSW readers configured?", "what telemetry does the store expose?", "how do async reads work?", "how are reserve bytes enforced?", "how do I reverse a transaction?", "how do I stream the audit log?", "what is ReadReplica?", "how do I open a read-only connection?", "how do I configure a read replica?"]
 ---
 
 # FinestVX Persistence Reference
@@ -328,6 +328,7 @@ class AsyncLedgerReader:
     async def list_book_codes(self) -> tuple[str, ...]: ...
     async def load_book(self, book_code: str) -> Book: ...
     async def iter_audit_log(self, *, limit: int | None = None) -> tuple[AuditLogRecord, ...]: ...
+    async def iter_audit_log_pages(self, *, page_size: int = 500, start_seq: int = 0) -> AsyncIterator[tuple[AuditLogRecord, ...]]: ...
     async def debug_snapshot(self) -> StoreConnectionDebugSnapshot: ...
     def close(self) -> None: ...
 ```
@@ -336,6 +337,8 @@ class AsyncLedgerReader:
 - Opens APSW `as_async(...)` with `SQLITE_OPEN_READONLY`.
 - Enforces `reserve_bytes` and read-only invariants at open time.
 - Exposes the same immutable read model as the synchronous reader pool.
+- `iter_audit_log_pages()` is an async generator; pages are `tuple[AuditLogRecord, ...]`, each at most `page_size` records.
+- `start_seq` skips all rows with `seq <= start_seq`; useful for resumable streaming from a known cursor position.
 
 ---
 
@@ -351,11 +354,13 @@ class SqliteLedgerStore:
     def database_path(self) -> Path: ...
     def create_book(self, book: Book, *, audit_context: AuditContext) -> StoreWriteReceipt: ...
     def append_transaction(self, book_code: str, transaction: JournalTransaction, *, audit_context: AuditContext) -> StoreWriteReceipt: ...
+    def append_reversal(self, book_code: str, original_ref: str, reversal_ref: str, *, audit_context: AuditContext) -> StoreWriteReceipt: ...
     def append_legislative_result(self, book_code: str, transaction_reference: str, result: LegislativeValidationResult, *, audit_context: AuditContext) -> StoreWriteReceipt: ...
     def load_book(self, book_code: str) -> Book: ...
     def list_book_codes(self) -> tuple[str, ...]: ...
     def export_book_payload(self, book_code: str) -> dict[str, object]: ...
     def iter_audit_log(self, *, limit: int | None = None) -> tuple[AuditLogRecord, ...]: ...
+    def iter_audit_log_pages(self, *, page_size: int = 500, start_seq: int = 0) -> Iterator[tuple[AuditLogRecord, ...]]: ...
     def create_snapshot(self, output_path: Path | str, *, compress: bool = True) -> DatabaseSnapshot: ...
     async def open_async_reader(self) -> AsyncLedgerReader: ...
     def debug_snapshot(self) -> StoreDebugSnapshot: ...
@@ -372,6 +377,8 @@ class SqliteLedgerStore:
 - `load_book()` raises `PersistenceIntegrityError` (`ftllexengine.integrity`) when deserialization produces a value that cannot satisfy domain model invariants (unknown currency code, precision violation); indicates schema migration gap or storage tampering.
 - Both integrity exceptions carry `IntegrityContext` for structured audit trail correlation.
 - Direct reads can run concurrently with writes; writer operations remain serialized by the internal writer lock.
+- `append_reversal()` atomically loads `original_ref`, inverts all entry sides (DEBIT↔CREDIT), sets `reversal_of=original_ref` on the new transaction, and writes it in a single SQLite transaction. Raises `KeyError` for unknown `book_code`, `ValueError("not found")` when `original_ref` does not exist, `ValueError("already reversed")` when `original_ref` is already marked reversed, and `ValueError("already in use")` when `reversal_ref` duplicates an existing transaction reference.
+- `iter_audit_log_pages()` is a synchronous generator yielding pages of `tuple[AuditLogRecord, ...]`; each page is at most `page_size` records. Uses `WHERE seq > ? ORDER BY seq LIMIT ?` cursor pagination — never materializes the full result set. `start_seq` resumes from a known cursor position.
 
 ---
 
@@ -399,6 +406,56 @@ def create_snapshot(
 ### Constraints
 - Return: `DatabaseSnapshot` with final byte count and WAL statistics.
 - Delegates to `store.create_snapshot(...)`.
+
+---
+
+## `ReadReplicaConfig`
+
+Immutable configuration for a periodically refreshed read-only WAL connection.
+
+### Signature
+```python
+@dataclass(frozen=True, slots=True)
+class ReadReplicaConfig:
+    database_path: Path | str
+    checkpoint_interval: float = 1.0
+    reader_statement_cache_size: int = 128
+    reserve_bytes: int = 0
+```
+
+### Constraints
+- `database_path` is normalized to `Path`.
+- `checkpoint_interval` must be positive; determines how often `ReadReplica` reconnects to release held WAL snapshot frames.
+- `reader_statement_cache_size` must be non-negative.
+- `reserve_bytes` must be between `0` and `255`; must match the target database's configured value.
+
+---
+
+## `ReadReplica`
+
+Async read-only facade that reconnects its underlying APSW connection periodically so the writer can checkpoint WAL frames.
+
+### Signature
+```python
+class ReadReplica:
+    @classmethod
+    async def open(cls, config: ReadReplicaConfig) -> ReadReplica: ...
+    async def refresh(self) -> None: ...
+    async def list_book_codes(self) -> tuple[str, ...]: ...
+    async def load_book(self, book_code: str) -> Book: ...
+    async def iter_audit_log(self, *, limit: int | None = None) -> tuple[AuditLogRecord, ...]: ...
+    async def iter_audit_log_pages(self, *, page_size: int = 500, start_seq: int = 0) -> AsyncIterator[tuple[AuditLogRecord, ...]]: ...
+    def close(self) -> None: ...
+```
+
+### Constraints
+- `open()` opens an `AsyncLedgerReader` over `config.database_path` and records `time.monotonic()` as the refresh baseline.
+- Before each read method, `_maybe_refresh()` checks whether `time.monotonic() - _last_refresh >= checkpoint_interval`; if so, reconnects and resets the baseline.
+- `refresh()` forces an immediate reconnect regardless of elapsed time.
+- All read methods delegate to the underlying `AsyncLedgerReader` after the refresh check.
+- `iter_audit_log_pages()` is an async generator; semantics are identical to `AsyncLedgerReader.iter_audit_log_pages()`.
+- `close()` closes the underlying `AsyncLedgerReader`; must be called when the replica is no longer needed.
+- Opened via `FinestVXService.open_read_replica(config)` for service-level deployments.
 
 ---
 

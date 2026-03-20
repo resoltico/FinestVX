@@ -18,6 +18,7 @@ from .core import validate_transaction_balance as validate_transaction_balance
 # Export layer
 from .export import ExportArtifact as ExportArtifact
 from .export import LedgerExporter as LedgerExporter
+from .export import book_from_saft as book_from_saft
 
 # Gateway layer
 from .gateway import FinestVXService as FinestVXService
@@ -43,6 +44,8 @@ from .persistence import AuditContext as AuditContext
 from .persistence import AuditLogRecord as AuditLogRecord
 from .persistence import DatabaseSnapshot as DatabaseSnapshot
 from .persistence import PersistenceConfig as PersistenceConfig
+from .persistence import ReadReplica as ReadReplica
+from .persistence import ReadReplicaConfig as ReadReplicaConfig
 from .persistence import SqliteLedgerStore as SqliteLedgerStore
 from .persistence import StoreConnectionDebugSnapshot as StoreConnectionDebugSnapshot
 from .persistence import StoreDebugSnapshot as StoreDebugSnapshot
@@ -56,6 +59,9 @@ from .persistence import create_snapshot as create_snapshot
 
 # Runtime layer
 from .runtime import LedgerRuntime as LedgerRuntime
+from .runtime import MultiBookDebugSnapshot as MultiBookDebugSnapshot
+from .runtime import MultiBookRuntime as MultiBookRuntime
+from .runtime import MultiBookRuntimeConfig as MultiBookRuntimeConfig
 from .runtime import RuntimeConfig as RuntimeConfig
 from .runtime import RuntimeDebugSnapshot as RuntimeDebugSnapshot
 
@@ -102,9 +108,14 @@ __all__: list[str] = [
     "LegislativePackMetadata",
     "LegislativePackRegistry",
     "LegislativeValidationResult",
+    "MultiBookDebugSnapshot",
+    "MultiBookRuntime",
+    "MultiBookRuntimeConfig",
     "PersistenceConfig",
     "PostedTransactionResult",
     "PostingSide",
+    "ReadReplica",
+    "ReadReplicaConfig",
     "RuntimeConfig",
     "RuntimeDebugSnapshot",
     "SqliteLedgerStore",
@@ -121,6 +132,7 @@ __all__: list[str] = [
     "ValidationFinding",
     "ValidationReport",
     "ValidationSeverity",
+    "book_from_saft",
     "create_default_pack_registry",
     "create_snapshot",
     "validate_book",

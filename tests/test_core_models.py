@@ -75,7 +75,7 @@ class TestLedgerEntry:
 
     def test_rejects_tax_rate_outside_ratio_range(self) -> None:
         """LedgerEntry rejects tax rates outside the inclusive 0..1 interval."""
-        with pytest.raises(ValueError, match="between 0 and 1"):
+        with pytest.raises(ValueError, match=r"in range \[0, 1\]"):
             LedgerEntry(
                 account_code="1000",
                 side=PostingSide.DEBIT,

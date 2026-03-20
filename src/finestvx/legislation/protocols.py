@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Protocol
 
 from ftllexengine import (
     coerce_tuple,
+    require_int_in_range,
     require_locale_code,
     require_non_empty_str,
     require_non_negative_int,
@@ -30,16 +31,6 @@ __all__ = [
     "LegislativeValidationResult",
 ]
 
-
-def _require_tax_year(value: object, field_name: str) -> int:
-    """Validate a tax-year integer."""
-    if isinstance(value, bool) or not isinstance(value, int):
-        msg = f"{field_name} must be int, got {type(value).__name__}"
-        raise TypeError(msg)
-    if not 1 <= value <= 9999:
-        msg = f"{field_name} must be between 1 and 9999"
-        raise ValueError(msg)
-    return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,7 +55,11 @@ class LegislativePackMetadata:
             msg = f"territory_code must be a valid ISO 3166-1 alpha-2 code, got {territory_code!r}"
             raise ValueError(msg)
         object.__setattr__(self, "territory_code", territory_code)
-        object.__setattr__(self, "tax_year", _require_tax_year(self.tax_year, "tax_year"))
+        object.__setattr__(
+            self,
+            "tax_year",
+            require_int_in_range(self.tax_year, 1, 9999, "tax_year"),
+        )
         object.__setattr__(
             self,
             "default_locale",

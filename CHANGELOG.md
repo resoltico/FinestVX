@@ -1,8 +1,8 @@
 ---
 afad: "3.3"
-version: "0.9.0"
+version: "0.10.0"
 domain: CHANGELOG
-updated: "2026-03-18"
+updated: "2026-03-20"
 route:
   keywords: [changelog, release notes, version history, breaking changes, migration, fixed, what's new]
   questions: ["what changed in version X?", "what are the breaking changes?", "what was fixed in the latest release?", "what is the release history?"]
@@ -14,6 +14,101 @@ Notable changes to this project are documented in this file. The format is based
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.10.0] - 2026-03-20
+
+### Added
+
+- **`MultiBookRuntime`** — per-book isolated runtime managing a pool of `LedgerRuntime`
+  instances. Each book occupies its own SQLite file under `data_directory`. A single
+  `MultiBookRuntime` manages the pool and routes `create_book`, `open_book`, `close_book`,
+  `append_transaction`, `create_reversal`, `append_legislative_result`, `get_book`,
+  `iter_audit_log`, `iter_audit_log_pages`, `create_snapshot`, and `debug_snapshot` calls
+  by `book_code`. Write serialization is per-book; each open book has its own dedicated
+  write thread. Guards the open-book dict with an `RWLock`; no read→write upgrades.
+- **`MultiBookRuntimeConfig`** — configuration dataclass for `MultiBookRuntime`; includes
+  `data_directory`, `persistence_template`, timing fields, and interpreter pool size bounds.
+- **`MultiBookDebugSnapshot`** — immutable snapshot carrying `data_directory`,
+  `open_book_count`, and per-book `RuntimeDebugSnapshot` tuples for observability.
+- **`book_from_saft`** in `finestvx.export` — SAF-T XML import: validates the file
+  against the bundled `ledger.xsd` schema via `lxml`, then maps accounts, periods, and
+  transactions back to domain objects. Raises `PersistenceIntegrityError` on parse
+  failure, schema violation, or domain invariant violation (e.g. invalid currency code,
+  unknown enum value).
+- **`ReadReplicaConfig`** in `finestvx.persistence` — configuration for a
+  periodically refreshed read-only WAL connection; `database_path`, `checkpoint_interval`
+  (default 1.0 s), `reader_statement_cache_size`, and `reserve_bytes`.
+- **`ReadReplica`** in `finestvx.persistence` — async read-only facade wrapping
+  `AsyncLedgerReader`; reconnects at most every `checkpoint_interval` seconds to release
+  held WAL snapshot frames so the writer can checkpoint. Exposes `list_book_codes`,
+  `load_book`, `iter_audit_log`, `iter_audit_log_pages`, `refresh`, and `close`.
+- **`FinestVXService.open_read_replica`** — async gateway method that opens a `ReadReplica`
+  pointing at the service's database file.
+
+### Refactored
+
+- **`normalize_optional_str` adopted from `ftllexengine` 0.159.0** — local
+  `normalize_optional_text` in `core/_validators.py` deleted entirely; all three
+  call sites (`core/models.py`, `core/serialization.py`) now delegate to the
+  upstream primitive. `core/_validators.py` is removed; its lone export was the
+  now-redundant wrapper.
+- **`normalize_optional_decimal_range` adopted from `ftllexengine` 0.159.0** —
+  private `_require_decimal_ratio` helper in `core/models.py` deleted; `LedgerEntry.tax_rate`
+  validation now uses the parameterized upstream function with `lo=0, hi=1`.
+  Error message updated to canonical `"{field} must be in range [{lo}, {hi}]"` format.
+- **`require_int_in_range` adopted from `ftllexengine` 0.159.0** — private
+  `_require_tax_year` helper in `legislation/protocols.py` deleted; four inline
+  range guards in `persistence/config.py` (`reserve_bytes` in `PersistenceConfig`
+  and `ReadReplicaConfig`) replaced with the upstream primitive. Error messages
+  updated to canonical `"{field} must be in range [{lo}, {hi}]"` format.
+
+### Tests
+
+- Property tests for `LedgerEntry.tax_rate` boundaries added to
+  `test_core_models_property.py` (`test_tax_rate_in_range_is_accepted`,
+  `test_tax_rate_out_of_range_is_rejected`, `test_description_whitespace_is_stripped`).
+- `test_legislation_protocols_property.py` — property tests for
+  `LegislativePackMetadata.tax_year` boundaries using `valid_tax_years()` and
+  `invalid_tax_years()` strategies.
+- `test_persistence_config_property.py` — property tests for `PersistenceConfig`
+  and `ReadReplicaConfig` `reserve_bytes` boundaries using `valid_reserve_bytes()`
+  and `invalid_reserve_bytes()` strategies.
+- `tests/fuzz/test_ledger_state_machine.py` — `RuleBasedStateMachine` exercising
+  append-only ledger semantics; three invariants checked after every rule step:
+  `transactions_is_tuple`, `all_stored_transactions_are_balanced`,
+  `running_totals_are_equal`.
+- `tests/strategies/accounting.py` extended with `tax_rates_in_range`,
+  `tax_rates_out_of_range`, and `optional_descriptions` strategies, all with
+  named tracker helpers and semantic `hypothesis.event()` instrumentation.
+- `tests/strategies/config.py` created with `valid_reserve_bytes`,
+  `invalid_reserve_bytes`, `valid_tax_years`, and `invalid_tax_years` strategies.
+- `tests/strategy_metrics.py` updated: all new strategy events registered in
+  `EXPECTED_EVENTS`, `STRATEGY_CATEGORIES`, and `INTENDED_WEIGHTS`.
+
+## [0.9.1] - 2026-03-19
+
+### Added
+
+- **`LedgerRuntime.create_reversal` and `FinestVXService.post_reversal`** — atomic
+  reversal API: loads the original transaction, inverts every entry (debit ↔ credit),
+  writes the reversal with `reversal_of` set, and runs legislative validation — all in
+  a single SQLite transaction dispatched through the single-writer queue.
+  `ValueError` is raised when the original reference is absent, the reversal reference
+  is already in use, or the original transaction is already reversed.
+- **`SqliteLedgerStore.append_reversal`** — store-level primitive backing the runtime
+  reversal command; performs all precondition checks and entry inversion within
+  `_writer_lock` to eliminate race conditions.
+- **`validate_fx_conversion`** in `finestvx.validation` — optional cross-currency FX
+  reconciliation validator; checks that debit total in `base_currency` multiplied by
+  `rate` matches the credit total in `counter_currency` within ISO 4217 decimal
+  precision. Returns findings `FX_RATE_INVALID`, `FX_BASE_CURRENCY_ABSENT`,
+  `FX_COUNTER_CURRENCY_ABSENT`, or `FX_RATE_MISMATCH`; does not alter the core
+  per-currency zero-sum invariant.
+- **`iter_audit_log_pages`** on `SqliteLedgerStore`, `AsyncLedgerReader`,
+  `LedgerRuntime`, and `FinestVXService` — cursor-based paginated audit log iterator
+  using `WHERE seq > last_seq` pagination; yields non-empty `tuple[AuditLogRecord, ...]`
+  pages without materializing the full audit log; removes the only memory-pressure path
+  in the read layer for high-volume books.
 
 ## [0.9.0] - 2026-03-18
 

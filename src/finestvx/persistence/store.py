@@ -8,7 +8,7 @@ from collections import deque
 from collections.abc import Buffer
 from compression import zstd
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from hashlib import blake2b
 from pathlib import Path
 from queue import Empty, Queue
@@ -19,17 +19,18 @@ import apsw
 import apsw.bestpractice as apsw_bestpractice
 from ftllexengine.integrity import IntegrityContext, LedgerInvariantError, PersistenceIntegrityError
 
-from finestvx.core.enums import TransactionState
-from finestvx.core.serialization import book_from_mapping, book_to_mapping
+from finestvx.core.enums import PostingSide, TransactionState
+from finestvx.core.models import JournalTransaction
+from finestvx.core.serialization import book_from_mapping, book_to_mapping, transaction_from_mapping
 from finestvx.core.validation import validate_chart_of_accounts, validate_transaction_balance
 from finestvx.persistence.config import DatabaseSnapshot
 from finestvx.persistence.schema import apply_sqlite_pragmas, install_schema
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable, Iterator
+    from collections.abc import AsyncIterator, Callable, Iterable, Iterator
     from typing import Self
 
-    from finestvx.core.models import Book, JournalTransaction
+    from finestvx.core.models import Book
     from finestvx.legislation.protocols import LegislativeValidationResult
     from finestvx.persistence.config import AuditContext, PersistenceConfig
 
@@ -706,6 +707,41 @@ class AsyncLedgerReader:
             await _fetchall_async(cast("Any", self._connection), sql, bindings)
         )
 
+    async def iter_audit_log_pages(
+        self,
+        *,
+        page_size: int = 500,
+        start_seq: int = 0,
+    ) -> AsyncIterator[tuple[AuditLogRecord, ...]]:
+        """Yield pages of audit log rows without materializing the full result set.
+
+        Uses cursor-based pagination keyed on ``seq`` so the result set never
+        grows beyond one page in memory regardless of audit log size.
+
+        Args:
+            page_size: Maximum number of rows per page.
+            start_seq: Sequence number lower bound (exclusive); rows with
+                ``seq <= start_seq`` are skipped.
+
+        Yields:
+            Non-empty tuples of :class:`AuditLogRecord` ordered by ``seq``.
+        """
+        sql = (
+            "SELECT seq, table_name, operation, row_pk, actor, reason, session_id, "
+            "monotonic_ms, row_signature, row_payload "
+            "FROM audit_log WHERE seq > ? ORDER BY seq LIMIT ?"
+        )
+        last_seq = start_seq
+        while True:
+            rows = await _fetchall_async(
+                cast("Any", self._connection), sql, (last_seq, page_size)
+            )
+            if not rows:
+                return
+            records = _build_audit_log_records(rows)
+            last_seq = records[-1].seq
+            yield records
+
     async def debug_snapshot(self) -> StoreConnectionDebugSnapshot:
         """Return APSW telemetry for the async reader connection."""
         connection = cast("Any", self._connection)
@@ -1201,6 +1237,142 @@ class SqliteLedgerStore:
                 ),
             )
 
+    def append_reversal(
+        self,
+        book_code: str,
+        original_ref: str,
+        reversal_ref: str,
+        *,
+        audit_context: AuditContext,
+    ) -> StoreWriteReceipt:
+        """Atomically append a reversal transaction that mirrors an existing posted transaction.
+
+        Loads the original transaction identified by ``original_ref``, inverts
+        every entry (debit becomes credit and vice versa), and writes the
+        resulting reversal transaction with ``reversal_of`` set to
+        ``original_ref`` — all within a single SQLite transaction.
+
+        Args:
+            book_code: Target book containing the original transaction.
+            original_ref: Reference of the transaction to reverse.
+            reversal_ref: Reference to assign to the new reversal transaction.
+            audit_context: Actor, reason, and session metadata for the write.
+
+        Returns:
+            A :class:`StoreWriteReceipt` for the completed reversal write.
+
+        Raises:
+            KeyError: If ``book_code`` is not found in the store.
+            ValueError: If ``original_ref`` does not exist in the book, if
+                ``reversal_ref`` is already in use, or if the original
+                transaction is already reversed.
+        """
+        with self._writer_lock:
+            tx_row = self._writer_connection.execute(
+                """
+                SELECT reference, posted_at, description, state,
+                       period_fiscal_year, period_quarter, period_month, reversal_of
+                FROM transactions
+                WHERE book_code = ? AND reference = ?
+                """,
+                (book_code, original_ref),
+            ).fetchone()
+            if tx_row is None:
+                exists_row = self._writer_connection.execute(
+                    "SELECT 1 FROM books WHERE book_code = ?", (book_code,)
+                ).fetchone()
+                if exists_row is None:
+                    msg = f"Unknown book: {book_code}"
+                    raise KeyError(msg)
+                msg = f"Transaction {original_ref!r} not found in book {book_code!r}"
+                raise ValueError(msg)
+            reversal_exists = self._writer_connection.execute(
+                "SELECT 1 FROM transactions WHERE book_code = ? AND reversal_of = ?",
+                (book_code, original_ref),
+            ).fetchone()
+            if reversal_exists is not None:
+                msg = (
+                    f"Transaction {original_ref!r} in book {book_code!r} "
+                    "is already reversed"
+                )
+                raise ValueError(msg)
+            dup_ref = self._writer_connection.execute(
+                "SELECT 1 FROM transactions WHERE book_code = ? AND reference = ?",
+                (book_code, reversal_ref),
+            ).fetchone()
+            if dup_ref is not None:
+                msg = (
+                    f"Reversal reference {reversal_ref!r} is already in use "
+                    f"in book {book_code!r}"
+                )
+                raise ValueError(msg)
+            entry_rows = _fetchall(
+                self._writer_connection,
+                """
+                SELECT account_code, side, amount, currency, description, tax_rate
+                FROM entries
+                WHERE book_code = ? AND transaction_reference = ?
+                ORDER BY line_no
+                """,
+                (book_code, original_ref),
+            )
+            period_payload: dict[str, int] | None = None
+            if tx_row[4] is not None:
+                period_payload = {
+                    "fiscal_year": cast("int", tx_row[4]),
+                    "quarter": cast("int", tx_row[5]),
+                    "month": cast("int", tx_row[6]),
+                }
+            original_tx = transaction_from_mapping(
+                {
+                    "reference": original_ref,
+                    "posted_at": tx_row[1],
+                    "description": tx_row[2],
+                    "state": tx_row[3],
+                    "period": period_payload,
+                    "reversal_of": tx_row[7],
+                    "entries": [
+                        {
+                            "account_code": row[0],
+                            "side": row[1],
+                            "amount": row[2],
+                            "currency": row[3],
+                            "description": row[4],
+                            "tax_rate": row[5],
+                        }
+                        for row in entry_rows
+                    ],
+                }
+            )
+            inverted_entries = tuple(
+                replace(
+                    entry,
+                    side=(
+                        PostingSide.CREDIT
+                        if entry.side is PostingSide.DEBIT
+                        else PostingSide.DEBIT
+                    ),
+                )
+                for entry in original_tx.entries
+            )
+            reversal_tx = JournalTransaction(
+                reference=reversal_ref,
+                posted_at=original_tx.posted_at,
+                description=f"Reversal of {original_ref}",
+                entries=inverted_entries,
+                period=original_tx.period,
+                state=TransactionState.POSTED,
+                reversal_of=original_ref,
+            )
+            with self._capture_write_session() as session, self._audit_context(audit_context):
+                with self._writer_connection:
+                    self._insert_transaction_rows(book_code, reversal_tx)
+                return _build_write_receipt(
+                    session,
+                    data_version=self._writer_connection.data_version(),
+                    last_wal_commit=self._last_wal_commit_snapshot(),
+                )
+
     def list_book_codes(self) -> tuple[str, ...]:
         """Return all known book codes in deterministic order."""
         with self._borrow_reader() as handle:
@@ -1234,6 +1406,40 @@ class SqliteLedgerStore:
             bindings = (limit,)
         with self._borrow_reader() as handle:
             return _build_audit_log_records(_fetchall(handle.connection, sql, bindings))
+
+    def iter_audit_log_pages(
+        self,
+        *,
+        page_size: int = 500,
+        start_seq: int = 0,
+    ) -> Iterator[tuple[AuditLogRecord, ...]]:
+        """Yield pages of audit log rows without materializing the full result set.
+
+        Uses cursor-based pagination keyed on ``seq`` so the result set never
+        grows beyond one page in memory regardless of audit log size.
+
+        Args:
+            page_size: Maximum number of rows per page.
+            start_seq: Sequence number lower bound (exclusive); rows with
+                ``seq <= start_seq`` are skipped.
+
+        Yields:
+            Non-empty tuples of :class:`AuditLogRecord` ordered by ``seq``.
+        """
+        sql = (
+            "SELECT seq, table_name, operation, row_pk, actor, reason, session_id, "
+            "monotonic_ms, row_signature, row_payload "
+            "FROM audit_log WHERE seq > ? ORDER BY seq LIMIT ?"
+        )
+        last_seq = start_seq
+        while True:
+            with self._borrow_reader() as handle:
+                rows = _fetchall(handle.connection, sql, (last_seq, page_size))
+            if not rows:
+                return
+            records = _build_audit_log_records(rows)
+            last_seq = records[-1].seq
+            yield records
 
     def append_legislative_result(
         self,

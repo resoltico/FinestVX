@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from ftllexengine import parse_ftl
 from ftllexengine.diagnostics import WarningSeverity
-from ftllexengine.introspection import validate_message_variables
+from ftllexengine.introspection import get_currency_decimal_digits, validate_message_variables
 from ftllexengine.syntax.ast import Message, Term
 from ftllexengine.validation import validate_resource
 
@@ -17,15 +18,20 @@ from .reports import ValidationFinding, ValidationReport, ValidationSeverity
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+    from ftllexengine.introspection import CurrencyCode
+
     from finestvx.core.models import Book, JournalTransaction
     from finestvx.legislation.protocols import LegislativeValidationResult
     from finestvx.legislation.registry import LegislativePackRegistry
+
+_FX_SOURCE = "core.fx"
 
 __all__ = [
     "report_from_legislative_result",
     "validate_book",
     "validate_ftl_resource",
     "validate_ftl_resource_schemas",
+    "validate_fx_conversion",
     "validate_legislative_transaction",
     "validate_transaction",
 ]
@@ -226,6 +232,82 @@ def validate_ftl_resource_schemas(
                     source="ftl.schema",
                 )
             )
+    return ValidationReport(tuple(findings))
+
+
+def validate_fx_conversion(
+    transaction: JournalTransaction,
+    base_currency: CurrencyCode,
+    counter_currency: CurrencyCode,
+    rate: Decimal,
+) -> ValidationReport:
+    """Validate a cross-currency FX conversion entry in a multi-currency transaction.
+
+    Checks that the debit total in ``base_currency`` multiplied by ``rate``
+    matches the credit total in ``counter_currency`` within ISO 4217 precision.
+    Does not alter the core per-currency zero-sum invariant.
+
+    Args:
+        transaction: The transaction under validation.
+        base_currency: Currency being sold or exchanged from.
+        counter_currency: Currency being purchased or exchanged to.
+        rate: Number of counter-currency units per one base-currency unit.
+
+    Returns:
+        An empty :class:`ValidationReport` when the conversion reconciles,
+        or a report containing ``FX_RATE_INVALID``, ``FX_BASE_CURRENCY_ABSENT``,
+        ``FX_COUNTER_CURRENCY_ABSENT``, or ``FX_RATE_MISMATCH`` findings.
+    """
+    if not rate.is_finite() or rate <= Decimal(0):
+        return ValidationReport(
+            (
+                ValidationFinding(
+                    code="FX_RATE_INVALID",
+                    message=f"FX rate must be a positive finite Decimal, got {rate!r}",
+                    severity=ValidationSeverity.ERROR,
+                    source=_FX_SOURCE,
+                ),
+            )
+        )
+    base_debit = transaction.debits_by_currency().get(base_currency, Decimal(0))
+    counter_credit = transaction.credits_by_currency().get(counter_currency, Decimal(0))
+    findings: list[ValidationFinding] = []
+    if base_debit == Decimal(0):
+        findings.append(
+            ValidationFinding(
+                code="FX_BASE_CURRENCY_ABSENT",
+                message=f"No debit entries found for base currency {base_currency}",
+                severity=ValidationSeverity.ERROR,
+                source=_FX_SOURCE,
+            )
+        )
+    if counter_credit == Decimal(0):
+        findings.append(
+            ValidationFinding(
+                code="FX_COUNTER_CURRENCY_ABSENT",
+                message=f"No credit entries found for counter currency {counter_currency}",
+                severity=ValidationSeverity.ERROR,
+                source=_FX_SOURCE,
+            )
+        )
+    if findings:
+        return ValidationReport(tuple(findings))
+    expected_counter = base_debit * rate
+    counter_precision = get_currency_decimal_digits(counter_currency)
+    precision_digits = counter_precision if counter_precision is not None else 2
+    tolerance = Decimal(10) ** -precision_digits
+    if abs(expected_counter - counter_credit) > tolerance:
+        findings.append(
+            ValidationFinding(
+                code="FX_RATE_MISMATCH",
+                message=(
+                    f"FX conversion mismatch: {base_currency} {base_debit} * {rate} = "
+                    f"{expected_counter}, but {counter_currency} credit total is {counter_credit}"
+                ),
+                severity=ValidationSeverity.ERROR,
+                source=_FX_SOURCE,
+            )
+        )
     return ValidationReport(tuple(findings))
 
 

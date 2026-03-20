@@ -10,12 +10,12 @@ from ftllexengine import (
     FiscalCalendar,
     FiscalPeriod,
     make_fluent_number,
+    normalize_optional_str,
     require_int,
     require_non_empty_str,
 )
 from ftllexengine.introspection import CurrencyCode
 
-from ._validators import normalize_optional_text
 from .enums import FiscalPeriodState, PostingSide, TransactionState
 from .models import Account, Book, BookPeriod, JournalTransaction, LedgerEntry
 
@@ -109,7 +109,7 @@ def _entry_from_mapping(payload: object) -> LedgerEntry:
         side=PostingSide(require_non_empty_str(data["side"], "entry.side")),
         amount=make_fluent_number(amount),
         currency=CurrencyCode(require_non_empty_str(data["currency"], "entry.currency")),
-        description=normalize_optional_text(data.get("description"), "entry.description"),
+        description=normalize_optional_str(data.get("description"), "entry.description"),
         tax_rate=None if tax_rate is None else _require_decimal(tax_rate, "entry.tax_rate"),
     )
 
@@ -141,7 +141,7 @@ def transaction_from_mapping(payload: object) -> JournalTransaction:
         ),
         period=None if period is None else _period_from_mapping(period, "transaction.period"),
         state=TransactionState(require_non_empty_str(data["state"], "transaction.state")),
-        reversal_of=normalize_optional_text(data.get("reversal_of"), "transaction.reversal_of"),
+        reversal_of=normalize_optional_str(data.get("reversal_of"), "transaction.reversal_of"),
     )
 
 
@@ -166,7 +166,7 @@ def _account_from_mapping(payload: object) -> Account:
         name=require_non_empty_str(data["name"], "account.name"),
         normal_side=PostingSide(require_non_empty_str(data["normal_side"], "account.normal_side")),
         currency=CurrencyCode(require_non_empty_str(data["currency"], "account.currency")),
-        parent_code=normalize_optional_text(data.get("parent_code"), "account.parent_code"),
+        parent_code=normalize_optional_str(data.get("parent_code"), "account.parent_code"),
         allow_posting=bool(data.get("allow_posting", True)),
         active=bool(data.get("active", True)),
     )

@@ -29,6 +29,7 @@ from finestvx.validation import (
 from finestvx.validation.service import report_from_legislative_result
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
     from typing import Self
 
@@ -36,6 +37,9 @@ if TYPE_CHECKING:
 
     from finestvx.core.models import Book, JournalTransaction
     from finestvx.legislation import LegislativeValidationResult
+    from finestvx.persistence import ReadReplica
+    from finestvx.persistence.config import ReadReplicaConfig
+    from finestvx.persistence.store import AuditLogRecord
 
 __all__ = [
     "FinestVXService",
@@ -143,6 +147,64 @@ class FinestVXService:
             legislative_write=legislative_write,
         )
 
+    def post_reversal(
+        self,
+        book_code: str,
+        original_ref: str,
+        *,
+        reversal_ref: str,
+        audit_context: AuditContext,
+    ) -> PostedTransactionResult:
+        """Atomically post a reversal transaction and audit its legislative result.
+
+        Loads the original transaction, inverts every entry (debit ↔ credit),
+        writes the reversal, then runs isolated legislative validation on the
+        resulting book snapshot.
+
+        Args:
+            book_code: Target book containing the original transaction.
+            original_ref: Reference of the transaction to reverse.
+            reversal_ref: Reference to assign to the new reversal transaction.
+            audit_context: Actor, reason, and session metadata for the write.
+
+        Returns:
+            A :class:`PostedTransactionResult` containing the ledger write
+            receipt, the legislative validation result, and the legislative
+            audit write receipt.
+
+        Raises:
+            KeyError: If ``book_code`` is not found.
+            ValueError: If ``original_ref`` is not found, ``reversal_ref`` is
+                already in use, or the original transaction is already reversed.
+        """
+        ledger_write = self._runtime.create_reversal(
+            book_code,
+            original_ref,
+            reversal_ref,
+            audit_context=audit_context,
+        )
+        book = self.get_book(book_code)
+        reversal_tx = next(
+            tx for tx in book.transactions if tx.reference == reversal_ref
+        )
+        result = self.interpreter_runner.validate(book.legislative_pack, book, reversal_tx)
+        legislative_audit_context = AuditContext(
+            actor=audit_context.actor,
+            reason=f"{audit_context.reason}:legislative-validation",
+            session_id=audit_context.session_id,
+        )
+        legislative_write = self._runtime.append_legislative_result(
+            book_code,
+            reversal_ref,
+            result,
+            audit_context=legislative_audit_context,
+        )
+        return PostedTransactionResult(
+            ledger_write=ledger_write,
+            legislative_result=result,
+            legislative_write=legislative_write,
+        )
+
     def get_book(self, book_code: str) -> Book:
         """Load a stored book snapshot."""
         return self._runtime.get_book_snapshot(book_code)
@@ -150,6 +212,27 @@ class FinestVXService:
     def list_book_codes(self) -> tuple[str, ...]:
         """Return all stored book codes."""
         return self._runtime.list_book_codes()
+
+    def iter_audit_log_pages(
+        self,
+        *,
+        page_size: int = 500,
+        start_seq: int = 0,
+    ) -> Iterator[tuple[AuditLogRecord, ...]]:
+        """Yield pages of audit log rows without materializing the full result set.
+
+        Args:
+            page_size: Maximum number of rows per page.
+            start_seq: Sequence number lower bound (exclusive).
+
+        Yields:
+            Non-empty tuples of :class:`~finestvx.persistence.store.AuditLogRecord`
+            ordered by ``seq``.
+        """
+        yield from self._runtime.iter_audit_log_pages(
+            page_size=page_size,
+            start_seq=start_seq,
+        )
 
     def validate_transaction(
         self,
@@ -235,6 +318,26 @@ class FinestVXService:
                 ``'introspection.iso'``.
         """
         clear_module_caches(components)
+
+    async def open_read_replica(self, config: ReadReplicaConfig) -> ReadReplica:
+        """Open a periodically refreshed read-only WAL connection for the book store.
+
+        The returned :class:`~finestvx.persistence.ReadReplica` reconnects its
+        underlying async APSW connection at most every
+        ``config.checkpoint_interval`` seconds, releasing WAL snapshot holds so
+        the writer can checkpoint frames.  Call :meth:`~finestvx.persistence.ReadReplica.close`
+        when the replica is no longer needed.
+
+        Args:
+            config: Configuration including the database path and checkpoint
+                interval.
+
+        Returns:
+            An open :class:`~finestvx.persistence.ReadReplica` instance.
+        """
+        from finestvx.persistence.replica import ReadReplica
+
+        return await ReadReplica.open(config)
 
     def debug_snapshot(self) -> GatewayDebugSnapshot:
         """Return a non-invasive snapshot for service-level introspection."""

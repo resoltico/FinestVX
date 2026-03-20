@@ -1,11 +1,11 @@
 ---
 afad: "3.3"
-version: "0.7.0"
+version: "0.9.0"
 domain: PRIMARY
-updated: "2026-03-17"
+updated: "2026-03-19"
 route:
-  keywords: [validation report, validation finding, validation severity, validate book, validate transaction, ftl resource validation, legislative validation]
-  questions: ["how do i validate a transaction?", "what is a ValidationReport?", "how does finestvx report validation errors?", "how do i validate an ftl resource?", "how do i validate against a legislative pack?"]
+  keywords: [validation report, validation finding, validation severity, validate book, validate transaction, ftl resource validation, legislative validation, validate fx conversion, fx rate validation, multi-currency validation]
+  questions: ["how do i validate a transaction?", "what is a ValidationReport?", "how does finestvx report validation errors?", "how do i validate an ftl resource?", "how do i validate against a legislative pack?", "how do i validate an fx transaction?", "how do i check an fx conversion rate?"]
 ---
 
 # FinestVX Validation Reference
@@ -183,6 +183,39 @@ def validate_ftl_resource_schemas(
 - `FTL_SCHEMA_MESSAGE_MISSING` (`ERROR`): a message declared in `expected_schemas` is absent from `source`.
 - `FTL_SCHEMA_MISMATCH` (`ERROR`): a message exists but its declared variable set differs from the expected set.
 - Uses `FluentLocalization.validate_message_variables()` internally.
+- Exported from `finestvx.validation`.
+
+---
+
+## `validate_fx_conversion`
+
+Function that reconciles cross-currency entries in a journal transaction against a declared exchange rate.
+
+### Signature
+```python
+def validate_fx_conversion(
+    transaction: JournalTransaction,
+    base_currency: CurrencyCode,
+    counter_currency: CurrencyCode,
+    rate: Decimal,
+) -> ValidationReport:
+```
+
+### Parameters
+| Name | Type | Req | Semantics |
+|:-----|:-----|:----|:----------|
+| `transaction` | `JournalTransaction` | Y | Transaction containing entries in both currencies |
+| `base_currency` | `CurrencyCode` | Y | Source (debit) currency |
+| `counter_currency` | `CurrencyCode` | Y | Target (credit) currency |
+| `rate` | `Decimal` | Y | Exchange rate; `base_debit_total * rate` must equal `counter_credit_total` within ISO 4217 precision |
+
+### Constraints
+- Return: `ValidationReport`; never raises on validation failures.
+- `FX_RATE_INVALID` (`ERROR`): `rate` is not finite and positive.
+- `FX_BASE_CURRENCY_ABSENT` (`ERROR`): no entries with `base_currency` found in `transaction`.
+- `FX_COUNTER_CURRENCY_ABSENT` (`ERROR`): no entries with `counter_currency` found in `transaction`.
+- `FX_RATE_MISMATCH` (`ERROR`): `base_debit_total * rate` differs from `counter_credit_total` beyond ISO 4217 decimal precision for `counter_currency`.
+- Does not alter the core zero-sum invariant; validates only the cross-currency reconciliation ratio.
 - Exported from `finestvx.validation`.
 
 ---

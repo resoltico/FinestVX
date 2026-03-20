@@ -59,7 +59,7 @@ class TestPersistenceAndRuntimeEdges:
             PersistenceConfig(tmp_path / "db.sqlite3", writer_statement_cache_size=-1)
         with pytest.raises(ValueError, match="reader_statement_cache_size must be non-negative"):
             PersistenceConfig(tmp_path / "db.sqlite3", reader_statement_cache_size=-1)
-        with pytest.raises(ValueError, match="reserve_bytes must be between 0 and 255 inclusive"):
+        with pytest.raises(ValueError, match=r"reserve_bytes must be in range \[0, 255\]"):
             PersistenceConfig(tmp_path / "db.sqlite3", reserve_bytes=256)
         with pytest.raises(ValueError, match="telemetry_buffer_size must be non-negative"):
             PersistenceConfig(tmp_path / "db.sqlite3", telemetry_buffer_size=-1)
@@ -221,6 +221,40 @@ class TestGatewayAndPackageEdges:
         assert "books" in create_receipt.changed_tables
         assert "audit_log" in post_result.legislative_write.changed_tables
         assert any(row.table_name == "legislative_validation" for row in audit_rows)
+
+        service.close()
+
+    def test_post_reversal_and_audit_log_pages(self, tmp_path: Path) -> None:
+        """post_reversal and iter_audit_log_pages are reachable from the gateway facade."""
+        service = FinestVXService(
+            FinestVXServiceConfig(RuntimeConfig(PersistenceConfig(tmp_path / "rev.sqlite3")))
+        )
+        book = build_sample_book()
+        audit_context = AuditContext(actor="tester", reason="bootstrap")
+        service.create_book(book, audit_context=audit_context)
+        service.post_transaction(
+            book.code,
+            build_posted_transaction(reference="TX-REV-0001"),
+            audit_context=AuditContext(actor="tester", reason="post"),
+        )
+
+        result = service.post_reversal(
+            book.code,
+            "TX-REV-0001",
+            reversal_ref="TX-REV-0001-R",
+            audit_context=AuditContext(actor="tester", reason="reversal"),
+        )
+
+        assert "transactions" in result.ledger_write.changed_tables
+        loaded = service.get_book(book.code)
+        reversal = next(t for t in loaded.transactions if t.reference == "TX-REV-0001-R")
+        assert reversal.reversal_of == "TX-REV-0001"
+        assert reversal.is_balanced is True
+
+        pages = list(service.iter_audit_log_pages(page_size=5))
+        paged_rows = [row for page in pages for row in page]
+        assert len(paged_rows) > 0
+        assert all(row.seq > 0 for row in paged_rows)
 
         service.close()
 

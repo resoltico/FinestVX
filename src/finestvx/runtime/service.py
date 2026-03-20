@@ -14,6 +14,7 @@ from ftllexengine.runtime import RWLock
 from finestvx.persistence import DatabaseSnapshot, SqliteLedgerStore, StoreWriteReceipt
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
     from typing import Self
 
@@ -96,6 +97,17 @@ class _AppendLegislativeResultCommand:
 
 
 @dataclass(frozen=True, slots=True)
+class _CreateReversalCommand:
+    """Internal queued request for an atomic transaction reversal."""
+
+    book_code: str
+    original_ref: str
+    reversal_ref: str
+    audit_context: AuditContext
+    future: Future[StoreWriteReceipt]
+
+
+@dataclass(frozen=True, slots=True)
 class _CreateSnapshotCommand:
     """Internal queued request for a WAL-consistent snapshot."""
 
@@ -108,6 +120,7 @@ type _RuntimeCommand = (
     _AppendLegislativeResultCommand
     | _AppendTransactionCommand
     | _CreateBookCommand
+    | _CreateReversalCommand
     | _CreateSnapshotCommand
 )
 
@@ -119,6 +132,7 @@ def _require_runtime_command(command: object) -> _RuntimeCommand:
             _CreateBookCommand()
             | _AppendTransactionCommand()
             | _AppendLegislativeResultCommand()
+            | _CreateReversalCommand()
             | _CreateSnapshotCommand()
         ):
             return command
@@ -243,6 +257,21 @@ class LedgerRuntime:
                             audit_context=audit_context,
                         )
                     )
+                case _CreateReversalCommand(
+                    book_code=book_code,
+                    original_ref=original_ref,
+                    reversal_ref=reversal_ref,
+                    audit_context=audit_context,
+                    future=future,
+                ):
+                    future.set_result(
+                        self._store.append_reversal(
+                            book_code,
+                            original_ref,
+                            reversal_ref,
+                            audit_context=audit_context,
+                        )
+                    )
                 case _CreateSnapshotCommand(
                     output_path=output_path,
                     compress=compress,
@@ -353,10 +382,72 @@ class LedgerRuntime:
         with self._lock.read(timeout=self._config.read_lock_timeout):
             return self._store.list_book_codes()
 
+    def create_reversal(
+        self,
+        book_code: str,
+        original_ref: str,
+        reversal_ref: str,
+        *,
+        audit_context: AuditContext,
+    ) -> StoreWriteReceipt:
+        """Atomically reverse an existing posted transaction.
+
+        Loads the original transaction, inverts every entry (debit ↔ credit),
+        and writes the reversal in a single SQLite transaction.
+
+        Args:
+            book_code: Target book containing the original transaction.
+            original_ref: Reference of the transaction to reverse.
+            reversal_ref: Reference to assign to the new reversal transaction.
+            audit_context: Actor, reason, and session metadata for the write.
+
+        Returns:
+            A :class:`StoreWriteReceipt` for the completed reversal write.
+
+        Raises:
+            KeyError: If ``book_code`` is not found.
+            ValueError: If ``original_ref`` is not found, ``reversal_ref`` is
+                already in use, or the original transaction is already reversed.
+        """
+        future: Future[StoreWriteReceipt] = Future()
+        with self._lock.read(timeout=self._config.read_lock_timeout):
+            return cast(
+                "StoreWriteReceipt",
+                self._submit(
+                    _CreateReversalCommand(
+                        book_code=book_code,
+                        original_ref=original_ref,
+                        reversal_ref=reversal_ref,
+                        audit_context=audit_context,
+                        future=future,
+                    )
+                ),
+            )
+
     def iter_audit_log(self, *, limit: int | None = None) -> tuple[AuditLogRecord, ...]:
         """Read audit log rows from the reader pool."""
         with self._lock.read(timeout=self._config.read_lock_timeout):
             return self._store.iter_audit_log(limit=limit)
+
+    def iter_audit_log_pages(
+        self,
+        *,
+        page_size: int = 500,
+        start_seq: int = 0,
+    ) -> Iterator[tuple[AuditLogRecord, ...]]:
+        """Yield pages of audit log rows without materializing the full result set.
+
+        Args:
+            page_size: Maximum number of rows per page.
+            start_seq: Sequence number lower bound (exclusive).
+
+        Yields:
+            Non-empty tuples of :class:`AuditLogRecord` ordered by ``seq``.
+        """
+        yield from self._store.iter_audit_log_pages(
+            page_size=page_size,
+            start_seq=start_seq,
+        )
 
     def create_snapshot(
         self,
